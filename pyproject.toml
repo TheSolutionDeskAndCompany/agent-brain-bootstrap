@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-brain-bootstrap"
+version = "0.1.0"
+description = "Agent bootstrap with mobile-first, accessible UI and RDP integration"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+dependencies = ["fastapi", "uvicorn", "pydantic"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+

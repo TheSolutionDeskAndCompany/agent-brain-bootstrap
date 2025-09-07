@@ -64,3 +64,26 @@ tuning tips, and quick examples. Designed for NVDA/Narrator users.
 
 ## License
 MIT
+
+
+## ?? Mobile & RDP Quick Start (iPhone / Amazon Fire)
+
+Run locally
+```bash
+python -m pip install fastapi uvicorn pydantic
+python mobile_server.py
+```
+Open: `http://<LAN-IP>:8000/public/mobile/index.html` on your phone/tablet.
+
+One-tap RDP
+```bash
+python scripts/rdp_profile_generator.py --host <RDP_HOST> --username <USER>
+# -> public/rdp/desktop.rdp
+```
+On your device, tap Connect to Desktop. The native RDP app opens and connects.
+
+Hands-free (iPhone)
+Use the Siri Shortcut recipe in `docs/ACCESSIBILITY.md`.
+
+Accessibility
+See `docs/ACCESSIBILITY.md` for VoiceOver/VoiceView usage, in-session screen readers, and best practices.

@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  guacd:
+    image: guacamole/guacd:1.5.5
+    restart: unless-stopped
+
+  guacamole:
+    image: guacamole/guacamole:1.5.5
+    depends_on: [ guacd ]
+    environment:
+      GUACD_HOSTNAME: guacd
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+
