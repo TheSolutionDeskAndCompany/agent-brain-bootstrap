@@ -350,6 +350,7 @@ def run_voice_loop(
     device: Optional[int] = None,
     threshold: int = THRESHOLD,
     wake_word: Optional[str] = None,
+    state: Optional[dict] = None,
 ) -> None:
     """Run the main voice interaction loop.
     
@@ -360,6 +361,39 @@ def run_voice_loop(
     """
     log.info(f"Starting voice loop in {mode} mode" + (" (No TTS)" if no_tts else ""))
     
+    def _handle_settings(cmd: str) -> Optional[str]:
+        nonlocal threshold, wake_word
+        t = _normalize(cmd)
+        # set threshold to N
+        m = re.match(r"^set (?:the )?threshold (?:to|=)\s*(\d{2,5})$", t)
+        if m:
+            try:
+                val = int(m.group(1))
+                threshold = val
+                if state is not None:
+                    state["threshold"] = val
+                return f"[settings] Threshold set to {val}"
+            except Exception:
+                return "[settings] Invalid threshold value"
+
+        # set wake word to X
+        m = re.match(r"^set (?:the )?wake\s*word (?:to|=)\s*(.+)$", t)
+        if m:
+            ww = m.group(1).strip()
+            wake_word = ww or None
+            if state is not None:
+                state["wake_word"] = wake_word
+            return f"[settings] Wake word set to '{wake_word or 'OFF'}'"
+
+        # disable wake word
+        if t in ("disable wake word", "turn off wake word", "wake word off"):
+            wake_word = None
+            if state is not None:
+                state["wake_word"] = None
+            return "[settings] Wake word disabled"
+
+        return None
+
     try:
         consecutive_errors = 0
         while True:
@@ -386,6 +420,10 @@ def run_voice_loop(
                         continue
 
                     print(f"[PTT] You said: {user_text}")
+                    msg = _handle_settings(user_text)
+                    if msg:
+                        print(msg)
+                        continue
                     cmd = _extract_after_wake(user_text, wake_word)
                     if cmd is None:
                         print(f"[wake] Ignored: {user_text!r}")
@@ -409,6 +447,12 @@ def run_voice_loop(
                     if not user_text:
                         print("[stt] Empty transcription.")
                         continue
+                    # allow settings changes pre-wake-word (so "set threshold ..." works with disabled wake word)
+                    msg = _handle_settings(user_text)
+                    if msg:
+                        print(msg)
+                        continue
+
                     cmd = _extract_after_wake(user_text, wake_word)
                     if cmd is None:
                         print(f"[wake] Ignored: {user_text!r}")

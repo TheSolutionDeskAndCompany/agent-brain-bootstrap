@@ -18,6 +18,12 @@ LOG_PATH = os.path.join(LOG_DIR, "agent.log")
 _last_transcript = None  # type: ignore
 _last_reply = None       # type: ignore
 STATUS_LINE = ""         # set in main()
+RUNTIME_STATE = {
+    "mode": None,
+    "wake_word": None,
+    "threshold": None,
+    "device": None,
+}
 
 def log_line(kind: str, text: str) -> None:
     try:
@@ -46,7 +52,7 @@ def generate_text(user_text: str) -> str:
             return "[repeat] Nothing to repeat yet."
 
         if t_norm in ("agent status", "status"):
-            return STATUS_LINE or "[status] Not available"
+            return build_status()
 
         brain = get_latest_brain_post()
         mood = (brain.get("acf") or {}).get("agent_emotions")
@@ -115,21 +121,35 @@ def main():
         log.info("Speak to interact with the agent")
         log.info("Press Ctrl+C to exit")
 
-        # Spoken-friendly status line for screen readers
-        global STATUS_LINE
-        def _device_name(idx):
-            try:
-                if idx is None:
-                    return 'default'
-                return sd.query_devices(idx)['name']
-            except Exception:
-                return 'default input'
-        STATUS_LINE = (
-            f"[status] Mode: {args.mode.upper()}  | Wake word: "
-            f"{args.wake_word or 'OFF'}  | TTS: OFF  | Model: qwen2.5 via Goose  | "
-            f"Input: {_device_name(args.device)}"
+    # Spoken-friendly status line for screen readers
+    global STATUS_LINE, RUNTIME_STATE
+    def _device_name(idx):
+        try:
+            if idx is None:
+                return 'default'
+            return sd.query_devices(idx)['name']
+        except Exception:
+            return 'default input'
+    def build_status() -> str:
+        ww = RUNTIME_STATE.get("wake_word")
+        th = RUNTIME_STATE.get("threshold")
+        mode = (RUNTIME_STATE.get("mode") or args.mode).upper()
+        inp = _device_name(RUNTIME_STATE.get("device"))
+        return (
+            f"[status] Mode: {mode}  | Wake word: {ww or 'OFF'}  | TTS: OFF  | "
+            f"Model: qwen2.5 via Goose  | Input: {inp}  | Threshold: {th}"
         )
-        print(STATUS_LINE)
+
+    # initialize runtime state
+    RUNTIME_STATE.update({
+        "mode": args.mode,
+        "wake_word": (args.wake_word or None),
+        "threshold": args.threshold,
+        "device": args.device,
+    })
+
+    STATUS_LINE = build_status()
+    print(STATUS_LINE)
 
         run_voice_loop(
             generate_text=generate_text,
@@ -138,6 +158,7 @@ def main():
             device=args.device,
             threshold=args.threshold,
             wake_word=(args.wake_word or None),
+            state=RUNTIME_STATE,
         )
         
     except KeyboardInterrupt:
