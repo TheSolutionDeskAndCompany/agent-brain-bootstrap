@@ -1,0 +1,85 @@
+{
+  "key": "group_agentbrain_core",
+  "title": "Agent Brain Core",
+  "fields": [
+    {
+      "key": "field_personality",
+      "label": "Agent Personality",
+      "name": "agent_personality",
+      "type": "textarea",
+      "instructions": "JSON describing default personality (tone, quirks, habits).",
+      "required": 0
+    },
+    {
+      "key": "field_emotions",
+      "label": "Agent Emotions",
+      "name": "agent_emotions",
+      "type": "textarea",
+      "instructions": "JSON of mood states (e.g. {\"happiness\":0.8,\"anger\":0.1}).",
+      "required": 0
+    },
+    {
+      "key": "field_memory",
+      "label": "Agent Memory",
+      "name": "agent_memory",
+      "type": "textarea",
+      "instructions": "Episodic or contextual memory data (JSON or text).",
+      "required": 0
+    },
+    {
+      "key": "field_dialogue",
+      "label": "Dialogue Lines",
+      "name": "agent_dialogue",
+      "type": "textarea",
+      "instructions": "Prewritten dialogue or voice responses.",
+      "required": 0
+    },
+    {
+      "key": "field_knowledge",
+      "label": "Knowledge Base",
+      "name": "agent_knowledge",
+      "type": "textarea",
+      "instructions": "Structured facts or notes the agent can use.",
+      "required": 0
+    },
+    {
+      "key": "field_constants",
+      "label": "Constants & Settings",
+      "name": "agent_constants",
+      "type": "textarea",
+      "instructions": "System constants, thresholds, global configs.",
+      "required": 0
+    },
+    {
+      "key": "field_behavior_flows",
+      "label": "Behavior Flows",
+      "name": "agent_flows",
+      "type": "textarea",
+      "instructions": "Flowcharts or JSON step guides for behaviors.",
+      "required": 0
+    },
+    {
+      "key": "field_humor",
+      "label": "Humor & Creativity",
+      "name": "agent_humor",
+      "type": "textarea",
+      "instructions": "Jokes, humor triggers, or creative snippets.",
+      "required": 0
+    }
+  ],
+  "location": [
+    [
+      {
+        "param": "post_type",
+        "operator": "==",
+        "value": "post"
+      }
+    ]
+  ],
+  "position": "normal",
+  "style": "default",
+  "label_placement": "top",
+  "instruction_placement": "label",
+  "active": true,
+  "description": "Core ACF fields for Agent Brain."
+}

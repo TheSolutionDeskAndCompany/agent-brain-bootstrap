@@ -1,0 +1,4 @@
+requests==2.32.3
+python-dotenv==1.0.1
+sounddevice==0.4.7
+numpy==1.26.4

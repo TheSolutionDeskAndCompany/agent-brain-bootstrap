@@ -1,0 +1,23 @@
+# Ignore environment config
+.env
+
+# Python cache & venv
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Logs & outputs
+*.log
+*.tmp
+*.bak
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+db_data/
+wordpress_data/
