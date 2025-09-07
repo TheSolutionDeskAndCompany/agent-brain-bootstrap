@@ -1,6 +1,10 @@
-param(
-  [ValidateSet("ptt","auto")] [string]$Mode = "ptt",
-  [switch]$NoTTS = $true
+Param(
+    [ValidateSet('ptt','auto')]
+    [string]$Mode = 'auto',
+    [switch]$NoTTS,
+    [int]$Device,
+    [int]$Threshold = 900,
+    [string]$WakeWord = 'agent'
 )
 
 Write-Host "[bootstrap] Loading env & paths..." -ForegroundColor Cyan
@@ -30,22 +34,25 @@ if (Test-Path $venvActivate) {
     }
 }
 
-# Install required packages
+# Install required packages (lightweight)
 $requiredPackages = @("requests", "sounddevice", "numpy", "python-dotenv")
 foreach ($pkg in $requiredPackages) {
-    python -m pip install --quiet $pkg
+    try { python -m pip show $pkg 1>$null 2>$null } catch { }
+    if ($LASTEXITCODE -ne 0) {
+        python -m pip install --disable-pip-version-check --quiet $pkg
+    }
 }
 
 # Set PYTHONPATH
 $env:PYTHONPATH = $projectRoot
 
 # Info banner
-Write-Host ("[goose] Provider configured? {0}" -f (goose info 2>$null)) -ForegroundColor DarkGray
-if ($NoTTS) { Write-Host "[agent] TTS disabled" -ForegroundColor Yellow }
+Write-Host "[agent] Starting ($Mode) | TTS: OFF | WakeWord: $WakeWord" -ForegroundColor Cyan
 
-# Launch the agent
-$flags = @("--mode", $Mode)
-if ($NoTTS) { $flags += "--no-tts" }
+# Build argument list for Python
+$argsList = @('agent/agent_main.py', '--mode', $Mode, '--no-tts')
+if ($PSBoundParameters.ContainsKey('Device')) { $argsList += @('--device', $Device) }
+if ($Mode -eq 'auto') { $argsList += @('--threshold', $Threshold) }
+if ($PSBoundParameters.ContainsKey('WakeWord')) { $argsList += @('--wake-word', $WakeWord) }
 
-Write-Host "Starting agent..." -ForegroundColor Cyan
-python -m agent.agent_main @flags
+python @argsList
