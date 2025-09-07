@@ -1,6 +1,6 @@
 # Agent Brain Bootstrap
 
-Accessible, voice‑driven developer assistant for Windows with Fire/Android tablet over RDP. Built accessibility‑first for blind users using NVDA, Narrator, or TalkBack.
+Accessible, voice‑driven developer assistant for Windows with iPhone/iPad or Android tablet over RDP. Built accessibility‑first for blind users using NVDA, Narrator, or TalkBack.
 
 This repo wires up Goose (orchestration) + Ollama (local models) + AssemblyAI (STT) into a hands‑free workflow with Auto VAD, wake word, and audible beeps. Output is console‑only so your screen reader speaks it.
 
@@ -35,9 +35,10 @@ Power options
 tuning tips, and quick examples. Designed for NVDA/Narrator users.
 
 ## Accessibility Notes
-- Use Microsoft Remote Desktop on the tablet.
-- In the RDP connection, set Sound = “Play on this device” and enable “Redirect microphone”.
+- Use Microsoft Remote Desktop on iPhone/iPad or Android.
+- In the RDP connection, set Sound = “Play on this device” and enable “Redirect microphone/Microphone”.
 - In Windows Sound → Recording, verify “Remote Audio” shows input levels when speaking.
+- iOS specifics: see `docs/ios-setup.md` for step‑by‑step setup and permissions.
 
 ## Configuration (env)
 - `GOOSE_PROVIDER` (default: `ollama`)
@@ -55,4 +56,3 @@ tuning tips, and quick examples. Designed for NVDA/Narrator users.
 
 ## License
 MIT
-
