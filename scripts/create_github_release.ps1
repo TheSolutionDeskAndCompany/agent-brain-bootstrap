@@ -1,45 +1,89 @@
-Param(
-    [string]$Tag = 'v0.1.0',
-    [string]$Title = 'Baseline Accessibility Build',
-    [string]$NotesPath = 'RELEASE_NOTES.md',
-    [switch]$Draft
+<# scripts/create_github_release.ps1
+   Create a GitHub release using gh.
+   Examples:
+     .\scripts\create_github_release.ps1 -Tag v0.1.0 -Title "Baseline Accessibility Build" -Draft
+     .\scripts\create_github_release.ps1 -Tag v0.1.1 -Title "Auto VAD + Wake" -NotesFile docs/release-notes-v0.1.1.md -Assets "dist\*.zip","logs\*.txt"
+#>
+
+[CmdletBinding()]
+param(
+  [Parameter(Mandatory=$true)][string]$Tag,
+  [Parameter(Mandatory=$true)][string]$Title,
+  [string]$Notes,
+  [string]$NotesFile,
+  [string[]]$Assets = @(),
+  [switch]$Draft,
+  [switch]$GenerateNotes
 )
 
-$ErrorActionPreference = 'Stop'
+function Write-Info($msg){ Write-Host $msg -ForegroundColor Cyan }
+function Write-Ok($msg){ Write-Host $msg -ForegroundColor Green }
+function Write-Err($msg){ Write-Host $msg -ForegroundColor Red }
 
-Write-Host "[release] Preparing GitHub release '$Tag' ($Title)" -ForegroundColor Cyan
-
-if (-not (Test-Path $NotesPath)) {
-    Write-Error "Notes file not found: $NotesPath"; exit 1
+# 1) gh presence
+try { gh --version | Out-Null } catch {
+  Write-Err "GitHub CLI (gh) is not installed. Run: .\scripts\install_gh.ps1"
+  exit 1
 }
 
-function Ensure-Tag {
-    param([string]$T)
-    $existing = git tag --list $T
-    if (-not $existing) {
-        Write-Host "[release] Creating tag $T" -ForegroundColor DarkGray
-        git tag -a $T -m $Title
-        git push origin $T
-    } else {
-        Write-Host "[release] Using existing tag $T" -ForegroundColor DarkGray
-    }
+# 2) auth status
+Write-Info "Checking GitHub auth..."
+gh auth status 2>$null
+if ($LASTEXITCODE -ne 0) {
+  Write-Err "You are not authenticated. Run: gh auth login"
+  exit 1
 }
 
-function Ensure-GH {
-    $gh = Get-Command gh -ErrorAction SilentlyContinue
-    if (-not $gh) {
-        Write-Error "GitHub CLI ('gh') not found. Install from https://cli.github.com and authenticate with 'gh auth login'."; exit 1
-    }
+# 3) Build args
+$flags = @("release","create",$Tag,"--title",$Title)
+if ($Draft) { $flags += "--draft" }
+if ($GenerateNotes) { $flags += "--generate-notes" }
+
+# Notes precedence: NotesFile > Notes > default
+if ($NotesFile) {
+  if (-not (Test-Path $NotesFile)) {
+    Write-Err "Notes file not found: $NotesFile"
+    exit 1
+  }
+  $flags += @("--notes-file",$NotesFile)
+} elseif ($Notes) {
+  $flags += @("--notes",$Notes)
+} elseif (-not $GenerateNotes) {
+  # sensible default notes
+  $default = @"
+**Release: $Title ($Tag)**
+
+## What's New
+- Hands-free Auto VAD with wake word "agent"
+- Audible beeps (start/stop)
+- NVDA-friendly status line
+- Repeat-last and logging to logs/agent.log
+- Voice Command Catalog in docs/voice-commands.md
+
+## Setup
+- Start agent: .\scripts\start_agent.ps1
+- Status: .\scripts\show_status.ps1
+- Sanity: .\scripts\sanity_agent.ps1 -Mode auto -NoTTS
+"@
+  $flags += @("--notes",$default)
 }
 
-Ensure-Tag -T $Tag
-Ensure-GH
+# 4) Expand assets (globs)
+$expanded = @()
+foreach ($pattern in $Assets) {
+  $files = Get-ChildItem -Path $pattern -File -ErrorAction SilentlyContinue
+  foreach ($f in $files) { $expanded += $f.FullName }
+}
+if ($expanded.Count -gt 0) { $flags += $expanded }
 
-$args = @('release','create', $Tag, '-t', $Title, '-F', $NotesPath)
-if ($Draft) { $args += '-d' }
-
-Write-Host "[release] gh $($args -join ' ')" -ForegroundColor DarkGray
-gh @args
-
-Write-Host "[release] Draft release created for tag $Tag" -ForegroundColor Green
+# 5) Create or update
+Write-Info "Creating release: $Tag"
+$env:GH_PAGER="cat"
+gh @flags
+if ($LASTEXITCODE -eq 0) {
+  Write-Ok "Release created."
+} else {
+  Write-Err "Failed to create release (gh exit $LASTEXITCODE)."
+  exit $LASTEXITCODE
+}
 
