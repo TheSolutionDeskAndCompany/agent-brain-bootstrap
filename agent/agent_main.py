@@ -3,6 +3,8 @@ import time
 import argparse
 import logging
 import sounddevice as sd
+from threading import Thread
+from agent import server as controller_server
 from agent.memory.wp_client import get_latest_brain_post
 from agent.decision_engine import respond
 from agent.speech.voice_loop import run_voice_loop, AssemblyAIClient
@@ -99,57 +101,49 @@ def main():
         print("Please set it in your .env file or environment variables.")
         print("You can get a free API key at https://app.assemblyai.com/signup")
         return
-    
-    # Spoken-friendly status line for screen readers
-    def _device_name(idx):
-        try:
-            if idx is None:
-                return 'default'
-            return sd.query_devices(idx)['name']
-        except Exception:
-            return 'default input'
-
-    status = (
-        f"[status] Mode: {args.mode.upper()}  | Wake word: "
-        f"{args.wake_word or 'OFF'}  | TTS: OFF  | Model: qwen2.5 via Goose  | "
-        f"Input: {_device_name(args.device)}"
-    )
-    print(status)
-
     try:
         log.info(f"Starting agent in {args.mode} mode" + (" (No TTS)" if args.no_tts else ""))
         log.info("Speak to interact with the agent")
         log.info("Press Ctrl+C to exit")
 
-    # Spoken-friendly status line for screen readers
-    global STATUS_LINE, RUNTIME_STATE
-    def _device_name(idx):
+        # Spoken-friendly status line for screen readers
+        global STATUS_LINE, RUNTIME_STATE
+
+        def _device_name(idx):
+            try:
+                if idx is None:
+                    return 'default'
+                return sd.query_devices(idx)['name']
+            except Exception:
+                return 'default input'
+
+        def build_status() -> str:
+            ww = RUNTIME_STATE.get("wake_word")
+            th = RUNTIME_STATE.get("threshold")
+            mode = (RUNTIME_STATE.get("mode") or args.mode).upper()
+            inp = _device_name(RUNTIME_STATE.get("device"))
+            return (
+                f"[status] Mode: {mode}  | Wake word: {ww or 'OFF'}  | TTS: OFF  | "
+                f"Model: qwen2.5 via Goose  | Input: {inp}  | Threshold: {th}"
+            )
+
+        # initialize runtime state
+        RUNTIME_STATE.update({
+            "mode": args.mode,
+            "wake_word": (args.wake_word or None),
+            "threshold": args.threshold,
+            "device": args.device,
+        })
+
+        STATUS_LINE = build_status()
+        print(STATUS_LINE)
+
+        # Start controller server in background
         try:
-            if idx is None:
-                return 'default'
-            return sd.query_devices(idx)['name']
-        except Exception:
-            return 'default input'
-    def build_status() -> str:
-        ww = RUNTIME_STATE.get("wake_word")
-        th = RUNTIME_STATE.get("threshold")
-        mode = (RUNTIME_STATE.get("mode") or args.mode).upper()
-        inp = _device_name(RUNTIME_STATE.get("device"))
-        return (
-            f"[status] Mode: {mode}  | Wake word: {ww or 'OFF'}  | TTS: OFF  | "
-            f"Model: qwen2.5 via Goose  | Input: {inp}  | Threshold: {th}"
-        )
-
-    # initialize runtime state
-    RUNTIME_STATE.update({
-        "mode": args.mode,
-        "wake_word": (args.wake_word or None),
-        "threshold": args.threshold,
-        "device": args.device,
-    })
-
-    STATUS_LINE = build_status()
-    print(STATUS_LINE)
+            Thread(target=controller_server.run, daemon=True).start()
+            log.info("Controller server running at http://localhost:8765/controller")
+        except Exception as e:
+            log.error(f"Failed to start controller server: {e}")
 
         run_voice_loop(
             generate_text=generate_text,
@@ -160,7 +154,7 @@ def main():
             wake_word=(args.wake_word or None),
             state=RUNTIME_STATE,
         )
-        
+
     except KeyboardInterrupt:
         log.info("Shutting down...")
     except Exception as e:

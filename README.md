@@ -1,5 +1,13 @@
 # Agent Brain Bootstrap
 
+## One‑Link Install (Windows)
+
+Run in PowerShell to download and install the latest build (replace `ORG/REPO` after you tag and publish):
+
+```
+iwr -useb https://raw.githubusercontent.com/ORG/REPO/main/scripts/bootstrap.ps1 | iex
+```
+
 Accessible, voice‑driven developer assistant for Windows with iPhone/iPad or Android tablet over RDP. Built accessibility‑first for blind users using NVDA, Narrator, or TalkBack.
 
 This repo wires up Goose (orchestration) + Ollama (local models) + AssemblyAI (STT) into a hands‑free workflow with Auto VAD, wake word, and audible beeps. Output is console‑only so your screen reader speaks it.

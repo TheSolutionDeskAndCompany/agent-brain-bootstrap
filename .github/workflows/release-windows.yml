@@ -1,0 +1,50 @@
+name: Release (Windows)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          if (Test-Path requirements.txt) { pip install -r requirements.txt }
+          if (Test-Path agent/requirements.txt) { pip install -r agent/requirements.txt }
+          pip install pyinstaller
+      - name: Build executable
+        shell: pwsh
+        run: |
+          pyinstaller -y --noconfirm ^
+            --name AgentBrain ^
+            --onefile ^
+            --add-data "public;public" ^
+            agent/agent_main.py
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe" installers\\windows\\agent-brain.iss /DAppVersion=${{ github.ref_name }}
+      - name: Checksums
+        shell: pwsh
+        run: |
+          certutil -hashfile "dist\\AgentBrain-Setup.exe" SHA256 > dist\\AgentBrain-Setup.exe.sha256.txt
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/AgentBrain-Setup.exe
+            dist/AgentBrain-Setup.exe.sha256.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

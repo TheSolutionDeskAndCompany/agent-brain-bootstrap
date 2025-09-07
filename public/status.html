@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Status</title>
+<style>
+  body { background:#0b0f14; color:#eef2f7; font:18px system-ui,Segoe UI,Arial; margin:0; padding:24px; }
+  pre { background:#0f172a; padding:16px; border-radius:12px; overflow:auto; }
+  a { color:#4ade80; }
+  .hint { color:#94a3b8; }
+  .wrap { display:flex; gap:12px; align-items:center; }
+  code { color:#22d3ee; }
+</style>
+</head>
+<body>
+  <h1>Status</h1>
+  <div class="wrap">
+    <strong>Runtime:</strong>
+    <span id="status" class="hint">Loading…</span>
+  </div>
+  <p><a href="/controller">Back</a></p>
+  <pre id="info">Coming soon…</pre>
+<script>
+async function load(){
+  try { const r=await fetch('/api/status'); const j=await r.json();
+    document.getElementById('status').textContent=j.status || '—';
+    document.getElementById('info').textContent=JSON.stringify(j.state || {}, null, 2);
+  } catch(e) {}
+}
+load();
+</script>
+</body>
+</html>
+
