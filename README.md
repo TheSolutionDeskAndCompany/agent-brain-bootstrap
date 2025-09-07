@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Agent Brain Bootstrap 🧠
 
 An AI Agent Brain environment for Windows PCs, orchestrated with Goose.
@@ -310,3 +311,7 @@ A Windows PC running the "Agent Brain" with:
 .\scripts\start_agent.ps1 -Mode auto
 ```
 
+=======
+# agent-brain-bootstrap
+Accessible voice-driven developer assistant for Windows, Fire Tablet + screen readers.  Bootstrap project integrating Goose, Ollama, and ElevenLabs.
+>>>>>>> origin/main
