@@ -1,0 +1,5 @@
+[
+  { "match": "^open vs code$", "rewrite": "open Visual Studio Code" },
+  { "match": "^repeat last$", "rewrite": "agent repeat last" },
+  { "match": "^explain error (.+)$", "rewrite": "explain error '$1' and suggest a fix" }
+]

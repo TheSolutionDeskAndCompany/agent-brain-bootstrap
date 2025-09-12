@@ -17,6 +17,7 @@ from .controller_bridge import AgentBridge
 
 APP_PORT = int(os.getenv("AGENT_PORT", "8765"))
 PUBLIC_DIR = Path(__file__).resolve().parent.parent / "public"
+LOG_FILE = Path.cwd() / "logs" / "agent.log"
 MAX_TEXT_LEN = int(os.getenv("MAX_TEXT_LEN", "4000"))
 
 app = FastAPI(title="AgentBrain Controller")
@@ -165,6 +166,23 @@ def run():
     if host == "0.0.0.0" and not AGENT_TOKEN and not os.getenv("ALLOW_INSECURE"):
         print("[WARN] Controller bound to 0.0.0.0 without AGENT_TOKEN. Set AGENT_TOKEN or AGENT_HOST=127.0.0.1.")
     uvicorn.run(app, host=host, port=APP_PORT, log_level="info")
+
+
+@app.get("/api/logs")
+def api_logs(lines: int = 200):
+    try:
+        n = max(1, min(int(lines), 2000))
+    except Exception:
+        n = 200
+    try:
+        if not LOG_FILE.exists():
+            return JSONResponse({"ok": True, "lines": []})
+        with LOG_FILE.open("r", encoding="utf-8", errors="ignore") as f:
+            data = f.read().splitlines()
+        tail = data[-n:]
+        return JSONResponse({"ok": True, "lines": tail})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
 if __name__ == "__main__":

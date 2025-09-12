@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import re
 import argparse
 import logging
 import sounddevice as sd
@@ -23,6 +24,7 @@ HISTORY_PATH = os.path.join(LOG_DIR, "history.json")
 _last_transcript = None  # type: ignore
 _last_reply = None       # type: ignore
 _history: list[tuple[str, str]] = []
+_macros: list[tuple[re.Pattern[str], str]] = []
 STATUS_LINE = ""         # set in main()
 RUNTIME_STATE = {
     "mode": None,
@@ -78,6 +80,27 @@ def _save_history(hist: list[tuple[str, str]], limit: int = 50) -> None:
     except Exception:
         pass
 
+def _load_macros() -> list[tuple[re.Pattern[str], str]]:
+    paths = [
+        os.path.join(os.path.dirname(__file__), 'config', 'macros.json'),
+        os.path.join(LOG_DIR, 'macros.json'),  # user override
+    ]
+    rules: list[tuple[re.Pattern[str], str]] = []
+    for p in paths:
+        try:
+            if os.path.isfile(p):
+                with open(p, 'r', encoding='utf-8') as f:
+                    data = json.load(f) or []
+                for item in data:
+                    m = str(item.get('match') or '').strip()
+                    r = str(item.get('rewrite') or '').strip()
+                    if not m or not r:
+                        continue
+                    rules.append((re.compile(m, re.IGNORECASE), r))
+        except Exception:
+            continue
+    return rules
+
 def generate_text(user_text: str) -> str:
     """Generate a response to the user's input using the decision engine."""
     try:
@@ -102,7 +125,8 @@ def generate_text(user_text: str) -> str:
             return (
                 "[help] Say 'agent status' | 'agent repeat last' | "
                 "'set threshold to 1100' | 'disable wake word'.\n"
-                "[help] You can also say 'agent history last 5' or 'agent audio device' or 'agent save settings'."
+                "[help] You can also say 'agent history last 5' or 'agent audio device' or 'agent save settings'.\n"
+                "[help] Custom macros: edit agent/config/macros.json or logs/macros.json and say 'agent reload macros'."
             )
 
         # History: 'agent history last N' or 'agent history'
@@ -135,6 +159,14 @@ def generate_text(user_text: str) -> str:
             except Exception:
                 return "[settings] Failed to save settings"
 
+        if t_norm in ("agent reload macros", "reload macros"):
+            try:
+                global _macros
+                _macros = _load_macros()
+                return f"[macros] Reloaded {_macros and len(_macros) or 0} macro(s)"
+            except Exception:
+                return "[macros] Failed to reload macros"
+
         if t_norm in ("agent audio device", "audio device"):
             try:
                 idx = RUNTIME_STATE.get("device")
@@ -147,10 +179,21 @@ def generate_text(user_text: str) -> str:
             except Exception:
                 return "[audio] Input device: default"
 
+        # Apply macros (regex rewrite) before fetching memory or calling model
+        text_for_model = user_text
+        for pat, rep in (_macros or []):
+            m = pat.match(user_text)
+            if m:
+                try:
+                    text_for_model = pat.sub(rep, user_text)
+                except Exception:
+                    text_for_model = user_text
+                break
+
         brain = get_latest_brain_post()
         mood = (brain.get("acf") or {}).get("agent_emotions")
         persona = (brain.get("acf") or {}).get("agent_personality")
-        reply = respond(user_text, mood=mood, persona=persona)
+        reply = respond(text_for_model, mood=mood, persona=persona)
 
         # Save last + log the interaction
         _last_transcript = user_text
@@ -207,8 +250,9 @@ def main():
     
     # Load history for continuity
     try:
-        global _history
+        global _history, _macros
         _history = _load_history(20)
+        _macros = _load_macros()
     except Exception:
         pass
 

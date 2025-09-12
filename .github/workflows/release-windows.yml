@@ -45,6 +45,20 @@ jobs:
         shell: pwsh
         run: |
           certutil -hashfile "dist\\AgentBrain-Setup.exe" SHA256 > dist\\AgentBrain-Setup.exe.sha256.txt
+      - name: Accessibility audit (axe)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          echo '::group::Install Node and Axe CLI'
+          choco install nodejs -y
+          refreshenv || echo ok
+          npm -g install @axe-core/cli
+          echo '::endgroup::'
+          echo '::group::Run accessibility checks'
+          npx axe --no-error public/controller.html
+          npx axe --no-error public/status.html
+          npx axe --no-error public/mobile/index.html
+          echo '::endgroup::'
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:

@@ -44,6 +44,22 @@
       <span class="hint" id="status">Loading...</span>
     </div>
     <p class="hint" id="out" role="status" aria-live="polite"></p>
+    <section aria-labelledby="sec-live">
+      <h2 id="sec-live" class="sr">Live Data</h2>
+      <div class="grid2">
+        <div>
+          <h3>Status JSON</h3>
+          <pre id="statusJson" aria-live="polite" style="min-height:120px"></pre>
+        </div>
+        <div>
+          <div class="wrap" style="justify-content:space-between">
+            <h3 style="margin:0">Logs (tail)</h3>
+            <button class="big" id="btnLogs">Refresh Logs</button>
+          </div>
+          <pre id="logs" style="min-height:120px"></pre>
+        </div>
+      </div>
+    </section>
   </main>
 <script>
 async function send(action, payload) {
@@ -68,14 +84,25 @@ async function refreshStatus(){
     const r = await fetch('/api/status');
     const j = await r.json();
     document.getElementById('status').textContent = j.status || '';
+    document.getElementById('statusJson').textContent = JSON.stringify(j, null, 2);
   } catch(e) { document.getElementById('status').textContent=''; }
+}
+async function refreshLogs(){
+  try {
+    const r = await fetch('/api/logs?lines=200');
+    const j = await r.json();
+    if (j.ok) {
+      document.getElementById('logs').textContent = (j.lines||[]).join('\n');
+    }
+  } catch(e) {}
 }
 btnStart.onclick=()=>send('start');
 btnStop.onclick=()=>send('stop');
 btnRefresh.onclick=()=>refreshStatus();
+btnLogs.onclick=()=>refreshLogs();
 btnDictate.onclick=()=>{ const c=prompt('Speak or type command:'); if(c) send('dictate',{text:c}); };
 refreshStatus();
+refreshLogs();
 </script>
 </body>
 </html>
-
