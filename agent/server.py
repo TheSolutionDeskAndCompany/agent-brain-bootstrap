@@ -67,6 +67,7 @@ class Action(str, Enum):
     stop = "stop"
     dictate = "dictate"
     status = "status"
+    set = "set"
 
 
 class CommandIn(BaseModel):
@@ -169,6 +170,24 @@ async def api_command(cmd: CommandIn, request: Request):
 
     if action == "status":
         return JSONResponse({"ok": True, "status": bridge.status()})
+
+    if action == "set":
+        # Apply runtime settings in agent_main if available
+        try:
+            from agent import agent_main as _am
+            state = getattr(_am, "RUNTIME_STATE", {})
+            changed = {}
+            uv = payload.get("use_webrtcvad")
+            if isinstance(uv, bool):
+                state["use_webrtcvad"] = uv
+                changed["use_webrtcvad"] = uv
+            vb = payload.get("verbosity")
+            if isinstance(vb, str) and vb.lower() in ("quiet","normal","verbose"):
+                state["verbosity"] = vb.lower()
+                changed["verbosity"] = state["verbosity"]
+            return JSONResponse({"ok": True, "changed": changed, "state": state})
+        except Exception as e:
+            return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
     return JSONResponse({"ok": False, "error": f"unknown action '{action}'"}, status_code=400)
 

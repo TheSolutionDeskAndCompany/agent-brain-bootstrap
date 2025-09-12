@@ -479,6 +479,23 @@ def run_voice_loop(
             except Exception:
                 return "[settings] Invalid input device index"
 
+        # enable/disable webrtc vad
+        if t in ("enable vad", "enable webrtc vad", "use webrtc vad"):
+            if state is not None:
+                state["use_webrtcvad"] = True
+            return "[settings] WebRTC VAD enabled"
+        if t in ("disable vad", "disable webrtc vad", "use amplitude vad"):
+            if state is not None:
+                state["use_webrtcvad"] = False
+            return "[settings] WebRTC VAD disabled"
+
+        # set verbosity
+        m = re.match(r"^set (?:the )?verbosity (?:to|=)\s*(quiet|normal|verbose)$", t)
+        if m:
+            if state is not None:
+                state["verbosity"] = m.group(1)
+            return f"[settings] Verbosity set to {m.group(1)}"
+
         return None
 
     try:
@@ -544,7 +561,9 @@ def run_voice_loop(
                         pass
 
                 elif mode == "auto":
-                    audio_data = listen_once_auto_v2(device=device, threshold=threshold, use_webrtcvad=use_webrtcvad, verbosity=verbosity)
+                    uv = (state or {}).get('use_webrtcvad', use_webrtcvad) if isinstance(state, dict) else use_webrtcvad
+                    vb = (state or {}).get('verbosity', verbosity) if isinstance(state, dict) else verbosity
+                    audio_data = listen_once_auto_v2(device=device, threshold=threshold, use_webrtcvad=bool(uv), verbosity=str(vb))
                     if audio_data.size == 0:
                         print("[listen] No audio captured.")
                         continue

@@ -22,15 +22,25 @@
   </div>
   <p><a href="/controller" class="linklike">Back</a></p>
   <pre id="info">Loading...</pre>
+  <h2>Performance</h2>
+  <pre id="perf">Loading...</pre>
 <script>
 async function load(){
   try { const r=await fetch('/api/status'); const j=await r.json();
     document.getElementById('status').textContent=j.status || '';
     document.getElementById('info').textContent=JSON.stringify(j.state || {}, null, 2);
   } catch(e) {}
+  try {
+    const r=await fetch('/api/perf'); const j=await r.json();
+    if (j.ok) {
+      const stt = j.perf?.stt || {count:0,total_ms:0,last_ms:0};
+      const gen = j.perf?.gen || {count:0,total_ms:0,last_ms:0};
+      const avg = (o)=> o.count ? Math.round(o.total_ms/o.count) : 0;
+      document.getElementById('perf').textContent = `STT: last=${stt.last_ms}ms avg=${avg(stt)}ms count=${stt.count}\nGEN: last=${gen.last_ms}ms avg=${avg(gen)}ms count=${gen.count}`;
+    }
+  } catch(e) {}
 }
 load();
 </script>
 </body>
 </html>
-

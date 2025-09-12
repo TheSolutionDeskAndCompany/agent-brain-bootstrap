@@ -39,6 +39,14 @@
       <a class="big linklike" href="/public/status.html">Status</a>
       <button class="big" id="btnRefresh">Refresh</button>
     </div>
+    <div class="row" aria-label="Settings" style="margin-top:8px">
+      <button class="big" id="btnVad">Toggle WebRTC VAD</button>
+      <select class="big" id="selVerb" aria-label="Verbosity">
+        <option value="quiet">Verbosity: Quiet</option>
+        <option value="normal" selected>Verbosity: Normal</option>
+        <option value="verbose">Verbosity: Verbose</option>
+      </select>
+    </div>
     <div class="wrap">
       <strong>Status:</strong>
       <span class="hint" id="status">Loading...</span>
@@ -75,6 +83,7 @@
     </section>
   </main>
 <script>
+let currentState = {};
 async function send(action, payload) {
   try {
     const headers = { 'Content-Type': 'application/json' };
@@ -98,6 +107,11 @@ async function refreshStatus(){
     const j = await r.json();
     document.getElementById('status').textContent = j.status || '';
     document.getElementById('statusJson').textContent = JSON.stringify(j, null, 2);
+    if (j.state) {
+      currentState = j.state;
+      const sel = document.getElementById('selVerb');
+      if (sel && currentState.verbosity) sel.value = currentState.verbosity;
+    }
   } catch(e) { document.getElementById('status').textContent=''; }
 }
 async function refreshLogs(){
@@ -151,11 +165,27 @@ btnLogs.onclick=()=>refreshLogs();
 btnLoadMacros.onclick=()=>loadMacros();
 btnSaveMacros.onclick=()=>saveMacros();
 btnDictate.onclick=()=>{ const c=prompt('Speak or type command:'); if(c) send('dictate',{text:c}); };
+btnVad.onclick=()=>{
+  const now = !!(currentState && currentState.use_webrtcvad);
+  setSettings({use_webrtcvad: !now}).then(()=>refreshStatus());
+}
+selVerb.onchange=(e)=>setSettings({verbosity:e.target.value});
 refreshStatus();
 refreshLogs();
 loadMacros();
 setInterval(refreshPerf, 5000);
 refreshPerf();
 </script>
+async function setSettings(payload){
+  try {
+    const headers = { 'Content-Type':'application/json' };
+    const t = localStorage.getItem('agent_token'); if (t) headers['X-Agent-Token'] = t;
+    const r = await fetch('/api/command',{method:'POST', headers, body: JSON.stringify({action:'set', payload})});
+    const j = await r.json();
+    const out=document.getElementById('out');
+    if (j.ok) { out.textContent = 'Settings updated'; out.className='ok'; }
+    else { out.textContent = j.error || 'Error'; out.className='err'; }
+  } catch(e) { document.getElementById('out').textContent='Network error'; }
+}
 </body>
 </html>

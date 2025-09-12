@@ -343,6 +343,8 @@ def main():
         wake_word = args.wake_word
         threshold = args.threshold
         device = args.device
+        use_vad = args.use_webrtcvad
+        verbosity = args.verbosity
         if not args.no_settings:
             try:
                 if wake_word == 'agent' and settings.get('wake_word'):
@@ -351,6 +353,12 @@ def main():
                     threshold = int(settings.get('threshold'))
                 if device is None and settings.get('device') is not None:
                     device = int(settings.get('device'))
+                if not args.use_webrtcvad and isinstance(settings.get('use_webrtcvad'), bool):
+                    use_vad = bool(settings.get('use_webrtcvad'))
+                if args.verbosity == 'normal' and isinstance(settings.get('verbosity'), str):
+                    v = str(settings.get('verbosity')).lower()
+                    if v in ('quiet','normal','verbose'):
+                        verbosity = v
             except Exception:
                 pass
 
@@ -359,6 +367,8 @@ def main():
             "wake_word": (wake_word or None),
             "threshold": threshold,
             "device": device,
+            "use_webrtcvad": use_vad,
+            "verbosity": verbosity,
             "perf": {"stt": {"count":0, "total_ms":0, "last_ms":0}, "gen": {"count":0, "total_ms":0, "last_ms":0}},
         })
 
@@ -371,6 +381,8 @@ def main():
                 "wake_word": RUNTIME_STATE.get("wake_word"),
                 "threshold": RUNTIME_STATE.get("threshold"),
                 "device": RUNTIME_STATE.get("device"),
+                "use_webrtcvad": RUNTIME_STATE.get("use_webrtcvad"),
+                "verbosity": RUNTIME_STATE.get("verbosity"),
             })
             _save_settings(s)
             print("[settings] Saved current settings to settings.json. Exiting.")
@@ -397,15 +409,6 @@ def main():
 
     except KeyboardInterrupt:
         log.info("Shutting down...")
-    if args.training:
-        print("\n[training] Quick walkthrough:")
-        print("  1) Say: 'agent status'  -> hear current config")
-        print("  2) Say: 'set threshold to 1100'  -> adjust sensitivity")
-        print("  3) Say: 'agent history last 3'  -> hear recent interactions")
-        print("  4) Say: 'agent save settings'  -> persist changes")
-        print("  5) Try a macro: edit macros in controller UI, then 'agent reload macros'")
-        input("\n[training] Press Enter to finish...")
-        return
     except Exception as e:
         log.error(f"Fatal error: {e}", exc_info=True)
 
