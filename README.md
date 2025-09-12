@@ -10,7 +10,7 @@ iwr -useb https://raw.githubusercontent.com/ORG/REPO/main/scripts/bootstrap.ps1 
 
 Accessible, voice‑driven developer assistant for Windows with iPhone/iPad or Android tablet over RDP. Built accessibility‑first for blind users using NVDA, Narrator, or TalkBack.
 
-This repo wires up Goose (orchestration) + Ollama (local models) + AssemblyAI (STT) into a hands‑free workflow with Auto VAD, wake word, and audible beeps. Output is console‑only so your screen reader speaks it.
+This repo wires up Goose (orchestration) + Ollama (local models) + AssemblyAI (STT) into a hands-free workflow with Auto VAD, wake word, and audible beeps. Output is console-only so your screen reader speaks it.
 
 ## Getting Started
 
@@ -24,7 +24,7 @@ Setup
 - Ensure `ASSEMBLYAI_API_KEY` is set in `.env`
 - (Optional) Start WordPress: `docker compose up -d` (http://localhost:8080)
 
-Start Agent (hands‑free)
+Start Agent (hands-free)
 - `./scripts/start_agent.ps1`
   - Default: Auto VAD, wake word `agent`, TTS OFF
   - Beeps on start/stop listening
@@ -56,6 +56,18 @@ tuning tips, and quick examples. Designed for NVDA/Narrator users.
 - `WP_BASE_URL`, `WP_JWT_TOKEN` (optional if using WordPress memory)
 - `LOG_LEVEL` (default: `INFO`)
 
+### Security (Controller & Mobile)
+- `AGENT_HOST` / `MOBILE_HOST`: Default to `127.0.0.1`. Only use `0.0.0.0` on trusted networks.
+- `AGENT_TOKEN`: If set, APIs require `X-Agent-Token` header.
+- `AGENT_SIGNING_KEY`: Optional HMAC signing for non-browser clients. Compute hex SHA256 of `${timestamp}.${body}` with the key and send `X-Agent-Timestamp` and `X-Agent-Sig` headers.
+- `RATE_LIMIT` / `MOBILE_RATE_LIMIT`: Per-IP rate limiting windows (e.g., `30/10`).
+- `MOBILE_CORS_ORIGINS`: Comma-separated origins for the mobile API; leave empty for dev.
+
+### Calibration
+- Run mic calibration to estimate a good threshold:
+  - `python agent/agent_main.py --calibrate`
+  - Then start with: `./scripts/start_agent.ps1 -Threshold <recommended>`
+
 ## Troubleshooting
 - Triggers too often: raise `-Threshold` (1100–1500)
 - Doesn’t trigger: lower to 700–800; check RDP mic levels
@@ -82,8 +94,9 @@ python scripts/rdp_profile_generator.py --host <RDP_HOST> --username <USER>
 ```
 On your device, tap Connect to Desktop. The native RDP app opens and connects.
 
-Hands-free (iPhone)
+hands-free (iPhone)
 Use the Siri Shortcut recipe in `docs/ACCESSIBILITY.md`.
 
 Accessibility
 See `docs/ACCESSIBILITY.md` for VoiceOver/VoiceView usage, in-session screen readers, and best practices.
+

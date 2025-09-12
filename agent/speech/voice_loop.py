@@ -81,6 +81,7 @@ class AssemblyAIClient:
         self.api_key = api_key or os.getenv(AAI_KEY_ENV)
         if not self.api_key:
             raise RuntimeError(f"{AAI_KEY_ENV} not set")
+        self._session = requests.Session()
 
     def _headers(self, content_type: Optional[str]=None):
         h = {"authorization": self.api_key}
@@ -89,20 +90,30 @@ class AssemblyAIClient:
 
     def upload(self, filepath: str) -> str:
         with open(filepath, "rb") as f:
-            r = requests.post("https://api.assemblyai.com/v2/upload",
-                              headers=self._headers(), data=f)
+            r = self._session.post(
+                "https://api.assemblyai.com/v2/upload",
+                headers=self._headers(),
+                data=f,
+                timeout=60,
+            )
         r.raise_for_status()
         return r.json()["upload_url"]
 
     def transcribe_url(self, url: str, poll_ms: int=800) -> str:
-        r = requests.post("https://api.assemblyai.com/v2/transcript",
-                          headers=self._headers("application/json"),
-                          json={"audio_url": url})
+        r = self._session.post(
+            "https://api.assemblyai.com/v2/transcript",
+            headers=self._headers("application/json"),
+            json={"audio_url": url},
+            timeout=30,
+        )
         r.raise_for_status()
         tid = r.json()["id"]
         while True:
-            s = requests.get(f"https://api.assemblyai.com/v2/transcript/{tid}",
-                             headers=self._headers())
+            s = self._session.get(
+                f"https://api.assemblyai.com/v2/transcript/{tid}",
+                headers=self._headers(),
+                timeout=30,
+            )
             s.raise_for_status()
             j = s.json()
             if j["status"] == "completed":

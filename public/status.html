@@ -11,20 +11,21 @@
   .hint { color:#94a3b8; }
   .wrap { display:flex; gap:12px; align-items:center; }
   code { color:#22d3ee; }
+  .linklike { color:#4ade80; }
 </style>
 </head>
 <body>
   <h1>Status</h1>
   <div class="wrap">
     <strong>Runtime:</strong>
-    <span id="status" class="hint">Loading…</span>
+    <span id="status" class="hint">Loading...</span>
   </div>
-  <p><a href="/controller">Back</a></p>
-  <pre id="info">Coming soon…</pre>
+  <p><a href="/controller" class="linklike">Back</a></p>
+  <pre id="info">Loading...</pre>
 <script>
 async function load(){
   try { const r=await fetch('/api/status'); const j=await r.json();
-    document.getElementById('status').textContent=j.status || '—';
+    document.getElementById('status').textContent=j.status || '';
     document.getElementById('info').textContent=JSON.stringify(j.state || {}, null, 2);
   } catch(e) {}
 }

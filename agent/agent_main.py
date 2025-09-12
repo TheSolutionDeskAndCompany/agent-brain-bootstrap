@@ -84,6 +84,8 @@ def main():
                       help='Audio device index (use list_devices.py to find)')
     parser.add_argument('--threshold', type=int, default=900,
                       help='Voice activation threshold (auto mode). Default: 900')
+    parser.add_argument('--calibrate', action='store_true',
+                      help='Run a short mic calibration to suggest a threshold, then exit')
     
     args = parser.parse_args()
     
@@ -101,10 +103,33 @@ def main():
         print("Please set it in your .env file or environment variables.")
         print("You can get a free API key at https://app.assemblyai.com/signup")
         return
+    
+    # Optional: quick mic calibration
+    if args.calibrate:
+        try:
+            print("\n[calibrate] Sampling ambient audio for 2 seconds...")
+            import numpy as _np
+            dur_s = 2.0
+            sr = 16000
+            n = int(sr * dur_s)
+            data = sd.rec(n, samplerate=sr, channels=1, dtype='int16', device=args.device)
+            sd.wait()
+            x = data.reshape(-1).astype(_np.int32)
+            rms = float((_np.sqrt(_np.mean((x * x)))))
+            # Suggest threshold as 2.5x ambient RMS, clamped
+            rec = int(max(600, min(2000, rms * 2.5)))
+            print(f"[calibrate] Ambient RMS ~ {rms:.1f} -> suggested Threshold ~ {rec}")
+            print("[calibrate] Try: ./scripts/start_agent.ps1 -Threshold {rec}")
+        except Exception as e:
+            log.error(f"Calibration failed: {e}")
+            print(f"[calibrate] Error: {e}")
+        return
     try:
         log.info(f"Starting agent in {args.mode} mode" + (" (No TTS)" if args.no_tts else ""))
         log.info("Speak to interact with the agent")
         log.info("Press Ctrl+C to exit")
+        print("[help] Say 'agent status' or 'agent repeat last'.")
+        print("[help] Adjust sensitivity with 'set threshold to 1100' or change wake word.")
 
         # Spoken-friendly status line for screen readers
         global STATUS_LINE, RUNTIME_STATE

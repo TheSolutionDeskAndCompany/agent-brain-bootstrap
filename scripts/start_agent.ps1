@@ -35,7 +35,8 @@ if (Test-Path $venvActivate) {
 }
 
 # Install required packages (lightweight)
-$requiredPackages = @("requests", "sounddevice", "numpy", "python-dotenv")
+# Include FastAPI/Uvicorn for the controller server
+$requiredPackages = @("requests", "sounddevice", "numpy", "python-dotenv", "fastapi", "uvicorn")
 foreach ($pkg in $requiredPackages) {
     try { python -m pip show $pkg 1>$null 2>$null } catch { }
     if ($LASTEXITCODE -ne 0) {

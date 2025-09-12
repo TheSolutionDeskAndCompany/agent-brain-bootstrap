@@ -3,6 +3,8 @@ from agent.config.settings import WP_BASE_URL, WP_JWT_TOKEN, WP_USERNAME, WP_APP
 from agent.utils.logger import get_logger
 log = get_logger("wp_client")
 
+SESSION = requests.Session()
+
 def _auth_headers():
     if WP_JWT_TOKEN:
         return {"Authorization": f"Bearer {WP_JWT_TOKEN}"}
@@ -13,7 +15,7 @@ def _auth_headers():
 
 def get_latest_brain_post():
     url = f"{WP_BASE_URL}/wp-json/wp/v2/posts?per_page=1&_fields=id,title,acf"
-    r = requests.get(url, headers=_auth_headers(), timeout=20)
+    r = SESSION.get(url, headers=_auth_headers(), timeout=20)
     r.raise_for_status()
     data = r.json()
     if not data:

@@ -11,6 +11,14 @@
 4. Speak Response: Replays the last answer.
 5. Connect to Desktop: Opens the RDP profile (native client) or web session.
 
+Security headers (optional)
+- If `AGENT_TOKEN` is set on the server, add a header in your client requests:
+  - Header: `X-Agent-Token: <your token>`
+- For non-browser clients, you can enable signing with `AGENT_SIGNING_KEY` and send:
+  - `X-Agent-Timestamp: <epoch seconds>`
+  - `X-Agent-Sig: <hex sha256 of "<timestamp>.<body>" with the key>`
+  - Note: Don’t embed signing keys in browser UIs; prefer a reverse proxy to sign or use token-only on trusted networks.
+
 ## One-tap Remote Desktop (RDP)
 Native app (recommended):
 - Install Microsoft Remote Desktop (iOS / Android). On Fire tablets, use Amazon Appstore version or a compatible RDP client.
@@ -35,4 +43,3 @@ Phrase: “Hey Siri, Ask Agent”.
 ## Fire tablet tips
 - Use VoiceView tutorial to learn gestures.
 - If Microsoft RD Client isn’t available in Appstore, use a compatible RDP client or the web gateway.
-
