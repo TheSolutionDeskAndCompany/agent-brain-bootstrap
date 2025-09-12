@@ -362,6 +362,8 @@ def run_voice_loop(
     threshold: int = THRESHOLD,
     wake_word: Optional[str] = None,
     state: Optional[dict] = None,
+    use_webrtcvad: bool = False,
+    verbosity: str = "normal",
 ) -> None:
     """Run the main voice interaction loop.
     
@@ -370,7 +372,7 @@ def run_voice_loop(
         mode: 'ptt' for push-to-talk or 'auto' for voice activity detection
         no_tts: If True, only print responses instead of using TTS
     """
-    log.info(f"Starting voice loop in {mode} mode" + (" (No TTS)" if no_tts else ""))
+    log.info(f"Starting voice loop in {mode} mode" + (" (No TTS)" if no_tts else "") + (" [webrtcvad]" if use_webrtcvad and VAD_AVAILABLE else ""))
     
     def _handle_settings(cmd: str) -> Optional[str]:
         nonlocal threshold, wake_word, device
@@ -439,7 +441,16 @@ def run_voice_loop(
 
                     # Convert to WAV and transcribe
                     wav_bytes = _wav_bytes_from_pcm16(audio_data)
+                    _t0 = time.time()
                     user_text = assemblyai_transcribe_wav(wav_bytes)
+                    _t1 = time.time()
+                    try:
+                        perf = (state or {}).setdefault('perf', {}).setdefault('stt', {'count':0,'total_ms':0,'last_ms':0})
+                        perf['count'] += 1
+                        perf['last_ms'] = int((_t1 - _t0)*1000)
+                        perf['total_ms'] += perf['last_ms']
+                    except Exception:
+                        pass
                     if not user_text:
                         print("[PTT] No speech detected or STT failed. Try again.")
                         continue
@@ -456,7 +467,16 @@ def run_voice_loop(
                     user_text = cmd
 
                     # Process the command
+                    _g0 = time.time()
                     response = generate_text(user_text)
+                    _g1 = time.time()
+                    try:
+                        perf = (state or {}).setdefault('perf', {}).setdefault('gen', {'count':0,'total_ms':0,'last_ms':0})
+                        perf['count'] += 1
+                        perf['last_ms'] = int((_g1 - _g0)*1000)
+                        perf['total_ms'] += perf['last_ms']
+                    except Exception:
+                        pass
                     print(f"[agent] {response}")
 
                     # Only use TTS if not in NoTTS mode (disabled in this project)
@@ -468,7 +488,16 @@ def run_voice_loop(
                     if audio_data.size == 0:
                         print("[listen] No audio captured.")
                         continue
+                    _t0 = time.time()
                     user_text = stt_transcribe(audio_data)
+                    _t1 = time.time()
+                    try:
+                        perf = (state or {}).setdefault('perf', {}).setdefault('stt', {'count':0,'total_ms':0,'last_ms':0})
+                        perf['count'] += 1
+                        perf['last_ms'] = int((_t1 - _t0)*1000)
+                        perf['total_ms'] += perf['last_ms']
+                    except Exception:
+                        pass
                     if not user_text:
                         print("[stt] Empty transcription.")
                         continue
@@ -484,7 +513,16 @@ def run_voice_loop(
                         continue
                     user_text = cmd
                     print(f"[stt] You said: {user_text}")
+                    _g0 = time.time()
                     response = generate_text(user_text)
+                    _g1 = time.time()
+                    try:
+                        perf = (state or {}).setdefault('perf', {}).setdefault('gen', {'count':0,'total_ms':0,'last_ms':0})
+                        perf['count'] += 1
+                        perf['last_ms'] = int((_g1 - _g0)*1000)
+                        perf['total_ms'] += perf['last_ms']
+                    except Exception:
+                        pass
                     print(f"[agent] {response}")
                     if not no_tts and response:
                         pass

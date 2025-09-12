@@ -9,6 +9,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi import Response
 from pydantic import BaseModel
 from enum import Enum
 
@@ -103,6 +104,16 @@ def api_status_compat():
         return {"ok": True, "status": s, "state": s}
 
 
+@app.get("/api/perf")
+def api_perf():
+    try:
+        from agent import agent_main as _am
+        perf = getattr(_am, "RUNTIME_STATE", {}).get("perf", {})
+        return {"ok": True, "perf": perf}
+    except Exception:
+        return {"ok": True, "perf": {}}
+
+
 @app.post("/api/command")
 async def api_command(cmd: CommandIn, request: Request):
     # Content-Type must be JSON for POST
@@ -168,6 +179,16 @@ def run():
     if host == "0.0.0.0" and not AGENT_TOKEN and not os.getenv("ALLOW_INSECURE"):
         print("[WARN] Controller bound to 0.0.0.0 without AGENT_TOKEN. Set AGENT_TOKEN or AGENT_HOST=127.0.0.1.")
     uvicorn.run(app, host=host, port=APP_PORT, log_level="info")
+
+
+@app.middleware("http")
+async def docs_guard(request: Request, call_next):
+    # Gate /docs and /openapi.json if token is configured
+    if request.url.path in ("/docs", "/openapi.json", "/redoc") and AGENT_TOKEN:
+        token = request.headers.get("x-agent-token", "").strip()
+        if token != AGENT_TOKEN:
+            return JSONResponse({"ok": False, "error": "unauthorized"}, status_code=401)
+    return await call_next(request)
 
 
 @app.get("/api/logs")

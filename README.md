@@ -68,6 +68,16 @@ tuning tips, and quick examples. Designed for NVDA/Narrator users.
   - `python agent/agent_main.py --calibrate`
   - Then start with: `./scripts/start_agent.ps1 -Threshold <recommended>`
 
+### Options (advanced)
+- Use WebRTC VAD: `python agent/agent_main.py --use-webrtcvad` (falls back if not available)
+- Verbosity: `--verbosity quiet|normal|verbose`
+- Training: `python agent/agent_main.py --training` (walkthrough cheatsheet)
+
+### RDP Reconnection
+- If the mobile device loses connection, you can relaunch the profile:
+  - `./scripts/rdp_reconnect.ps1` (opens `public/rdp/desktop.rdp`)
+  - If missing, generate with: `python scripts/rdp_profile_generator.py --host <RDP_HOST> --username <USER>`
+
 ### Macros (Custom Voice Rewrites)
 - Where: Default rules at `agent/config/macros.json`. User override at `logs/macros.json` (takes precedence)
 - Format: JSON array of objects with `match` (regex) and `rewrite` (replacement). See `docs/macros-sample.json`

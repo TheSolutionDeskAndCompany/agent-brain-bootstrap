@@ -108,3 +108,45 @@ def test_mobile_requires_json_content_type():
     client = TestClient(m.app)
     r = client.post('/api/agent', headers={'X-Agent-Token': token}, data='input=hello')
     assert r.status_code == 415
+
+
+def test_controller_dictate_path_executes():
+    token = 't3'
+    mod = reload_server_with_env({
+        'AGENT_TOKEN': token,
+        'AGENT_HOST': '127.0.0.1',
+        'MAX_TEXT_LEN': '4000',
+    })
+    client = TestClient(mod.app)
+    r = client.post('/api/command', headers={'X-Agent-Token': token}, json={'action':'dictate', 'payload':{'text':'hello world'}})
+    # Should respond 200 with JSON structure, ok may be False depending on backend
+    assert r.status_code == 200
+    j = r.json()
+    assert 'ok' in j
+    assert 'running' in j
+
+
+def test_perf_endpoint():
+    mod = reload_server_with_env({
+        'AGENT_TOKEN': '',
+        'AGENT_HOST': '127.0.0.1',
+    })
+    client = TestClient(mod.app)
+    r = client.get('/api/perf')
+    assert r.status_code == 200
+    j = r.json()
+    assert j.get('ok') is True
+    assert 'perf' in j
+
+
+def test_docs_guard_with_token():
+    token = 'secret'
+    mod = reload_server_with_env({
+        'AGENT_TOKEN': token,
+        'AGENT_HOST': '127.0.0.1',
+    })
+    client = TestClient(mod.app)
+    r = client.get('/docs')
+    assert r.status_code == 401
+    r = client.get('/docs', headers={'X-Agent-Token': token})
+    assert r.status_code in (200, 307, 308)  # FastAPI may redirect

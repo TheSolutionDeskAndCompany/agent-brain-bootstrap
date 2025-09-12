@@ -236,6 +236,12 @@ def main():
                       help='Ignore persisted settings.json values')
     parser.add_argument('--save-settings', action='store_true',
                       help='Persist current threshold/wake word/device to settings.json and exit')
+    parser.add_argument('--use-webrtcvad', action='store_true',
+                      help='Use webrtcvad for voice activity detection when available')
+    parser.add_argument('--verbosity', choices=['quiet','normal','verbose'], default='normal',
+                      help='Console verbosity for prompts and cues')
+    parser.add_argument('--training', action='store_true',
+                      help='Show a short training walkthrough and exit')
     parser.add_argument('--calibrate', action='store_true',
                       help='Run a short mic calibration to suggest a threshold, then exit')
     
@@ -325,9 +331,11 @@ def main():
             th = RUNTIME_STATE.get("threshold")
             mode = (RUNTIME_STATE.get("mode") or args.mode).upper()
             inp = _device_name(RUNTIME_STATE.get("device"))
+            vad = 'webrtc' if args.use_webrtcvad else 'amplitude'
+            vb = args.verbosity
             return (
                 f"[status] Mode: {mode}  | Wake word: {ww or 'OFF'}  | TTS: OFF  | "
-                f"Model: qwen2.5 via Goose  | Input: {inp}  | Threshold: {th}"
+                f"Model: qwen2.5 via Goose  | Input: {inp}  | Threshold: {th}  | VAD: {vad}  | Verbosity: {vb}"
             )
 
         # Initialize runtime state (apply persisted settings if present and not overridden)
@@ -351,6 +359,7 @@ def main():
             "wake_word": (wake_word or None),
             "threshold": threshold,
             "device": device,
+            "perf": {"stt": {"count":0, "total_ms":0, "last_ms":0}, "gen": {"count":0, "total_ms":0, "last_ms":0}},
         })
 
         STATUS_LINE = build_status()
@@ -382,10 +391,21 @@ def main():
             threshold=RUNTIME_STATE.get("threshold"),
             wake_word=RUNTIME_STATE.get("wake_word"),
             state=RUNTIME_STATE,
+            use_webrtcvad=args.use_webrtcvad,
+            verbosity=args.verbosity,
         )
 
     except KeyboardInterrupt:
         log.info("Shutting down...")
+    if args.training:
+        print("\n[training] Quick walkthrough:")
+        print("  1) Say: 'agent status'  -> hear current config")
+        print("  2) Say: 'set threshold to 1100'  -> adjust sensitivity")
+        print("  3) Say: 'agent history last 3'  -> hear recent interactions")
+        print("  4) Say: 'agent save settings'  -> persist changes")
+        print("  5) Try a macro: edit macros in controller UI, then 'agent reload macros'")
+        input("\n[training] Press Enter to finish...")
+        return
     except Exception as e:
         log.error(f"Fatal error: {e}", exc_info=True)
 
