@@ -242,8 +242,6 @@ def main():
                       help='Console verbosity for prompts and cues')
     parser.add_argument('--training', action='store_true',
                       help='Show a short training walkthrough and exit')
-    parser.add_argument('--calibrate', action='store_true',
-                      help='Run a short mic calibration to suggest a threshold, then exit')
     
     args = parser.parse_args()
     
