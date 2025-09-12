@@ -60,6 +60,10 @@
         </div>
       </div>
       <div style="margin-top:16px">
+        <h3>Performance</h3>
+        <pre id="perf" style="min-height:60px"></pre>
+      </div>
+      <div style="margin-top:16px">
         <h3>Macros Editor</h3>
         <p class="hint">Edit regex-based rewrite rules. Format: array of {match, rewrite}.</p>
         <textarea id="macros" style="width:100%;min-height:200px"></textarea>
@@ -105,6 +109,18 @@ async function refreshLogs(){
     }
   } catch(e) {}
 }
+async function refreshPerf(){
+  try {
+    const r = await fetch('/api/perf');
+    const j = await r.json();
+    if (j.ok) {
+      const stt = j.perf?.stt || {count:0,total_ms:0,last_ms:0};
+      const gen = j.perf?.gen || {count:0,total_ms:0,last_ms:0};
+      const avg = (o)=> o.count ? Math.round(o.total_ms/o.count) : 0;
+      document.getElementById('perf').textContent = `STT: last=${stt.last_ms}ms avg=${avg(stt)}ms count=${stt.count}\nGEN: last=${gen.last_ms}ms avg=${avg(gen)}ms count=${gen.count}`;
+    }
+  } catch(e) {}
+}
 async function loadMacros(){
   try {
     const r = await fetch('/api/macros');
@@ -138,6 +154,8 @@ btnDictate.onclick=()=>{ const c=prompt('Speak or type command:'); if(c) send('d
 refreshStatus();
 refreshLogs();
 loadMacros();
+setInterval(refreshPerf, 5000);
+refreshPerf();
 </script>
 </body>
 </html>

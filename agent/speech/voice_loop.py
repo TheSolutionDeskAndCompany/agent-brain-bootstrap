@@ -340,6 +340,66 @@ def listen_once_auto(device: Optional[int]=None,
     print(f"[listen] Captured {dur:.2f}s of audio")
     return audio
 
+def listen_once_auto_v2(device: Optional[int]=None,
+                        threshold: int=THRESHOLD,
+                        min_talk_ms: int=MIN_TALK_MS,
+                        tail_sil_ms: int=TAIL_SIL_MS,
+                        max_utter_ms: int=MAX_UTTER_MS,
+                        use_webrtcvad: bool=False,
+                        verbosity: str = "normal") -> np.ndarray:
+    """Improved listen with optional webrtcvad and verbosity controls."""
+    def say(msg: str):
+        if verbosity != "quiet":
+            print(msg)
+
+    if use_webrtcvad and VAD_AVAILABLE:
+        try:
+            vad = webrtcvad.Vad(2)
+            block_len = int(SR * (BLOCK_MS / 1000.0))
+            with sd.InputStream(samplerate=SR, channels=1, dtype='int16', device=device,
+                                blocksize=block_len) as stream:
+                say("[listen] Waiting for speech (webrtcvad)...")
+                voiced: list[np.ndarray] = []
+                started = False
+                silence_count = 0
+                tail_blocks = int(tail_sil_ms / BLOCK_MS)
+                max_blocks = int(max_utter_ms / BLOCK_MS)
+                total_blocks = 0
+                while True:
+                    data, _ = stream.read(block_len)
+                    total_blocks += 1
+                    frame = data.reshape(-1)
+                    is_speech = vad.is_speech(frame.tobytes(), sample_rate=SR)
+                    if not started and is_speech:
+                        started = True
+                        _cue_start()
+                    if started:
+                        voiced.append(frame.copy())
+                        if not is_speech:
+                            silence_count += 1
+                        else:
+                            silence_count = 0
+                        if silence_count >= tail_blocks or total_blocks >= max_blocks:
+                            _cue_end()
+                            break
+                audio = np.concatenate(voiced).astype(np.int16) if voiced else np.zeros((0,), dtype=np.int16)
+                say(f"[listen] Captured {len(audio)/SR:.2f}s of audio")
+                return audio
+        except Exception:
+            # fall back to amplitude
+            pass
+
+    say(f"[listen] Waiting for speech... threshold={threshold}, device={device}")
+    audio = _record_utterance(
+        device=device,
+        threshold=threshold,
+        min_talk_ms=min_talk_ms,
+        tail_sil_ms=tail_sil_ms,
+        max_utter_ms=max_utter_ms
+    )
+    say(f"[listen] Captured {len(audio)/SR:.2f}s of audio")
+    return audio
+
 def stt_transcribe(audio: np.ndarray, aai: Optional[AssemblyAIClient]=None) -> str:
     aai = aai or AssemblyAIClient()
     wav_path = _save_wav_int16(audio, SR)
@@ -484,7 +544,7 @@ def run_voice_loop(
                         pass
 
                 elif mode == "auto":
-                    audio_data = listen_once_auto(device=device, threshold=threshold)
+                    audio_data = listen_once_auto_v2(device=device, threshold=threshold, use_webrtcvad=use_webrtcvad, verbosity=verbosity)
                     if audio_data.size == 0:
                         print("[listen] No audio captured.")
                         continue

@@ -73,6 +73,10 @@ tuning tips, and quick examples. Designed for NVDA/Narrator users.
 - Verbosity: `--verbosity quiet|normal|verbose`
 - Training: `python agent/agent_main.py --training` (walkthrough cheatsheet)
 
+Install WebRTC VAD (optional)
+- Windows: `python -m pip install webrtcvad`
+- If installation fails, skip this option and rely on the default amplitude gate + calibration.
+
 ### RDP Reconnection
 - If the mobile device loses connection, you can relaunch the profile:
   - `./scripts/rdp_reconnect.ps1` (opens `public/rdp/desktop.rdp`)

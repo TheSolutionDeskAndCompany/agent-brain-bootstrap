@@ -59,6 +59,24 @@ jobs:
           npx axe --no-error public/status.html
           npx axe --no-error public/mobile/index.html
           echo '::endgroup::'
+      - name: Local server accessibility audit (axe)
+        shell: pwsh
+        continue-on-error: true
+        env:
+          AGENT_HOST: 127.0.0.1
+        run: |
+          echo '::group::Start local server'
+          python -m pip install -r agent/requirements.txt
+          $job = Start-Job -ScriptBlock { python -m uvicorn agent.server:app --host 127.0.0.1 --port 8765 }
+          Start-Sleep -Seconds 5
+          echo '::endgroup::'
+          echo '::group::Run axe against server pages'
+          npx axe --no-error http://127.0.0.1:8765/controller
+          npx axe --no-error http://127.0.0.1:8765/public/status.html
+          npx axe --no-error http://127.0.0.1:8765/public/mobile/index.html
+          echo '::endgroup::'
+          Stop-Job $job -Force
+          Remove-Job $job
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
