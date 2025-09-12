@@ -18,6 +18,8 @@ from .controller_bridge import AgentBridge
 APP_PORT = int(os.getenv("AGENT_PORT", "8765"))
 PUBLIC_DIR = Path(__file__).resolve().parent.parent / "public"
 LOG_FILE = Path.cwd() / "logs" / "agent.log"
+MACROS_DEFAULT = Path(__file__).resolve().parent / "config" / "macros.json"
+MACROS_USER = Path.cwd() / "logs" / "macros.json"
 MAX_TEXT_LEN = int(os.getenv("MAX_TEXT_LEN", "4000"))
 
 app = FastAPI(title="AgentBrain Controller")
@@ -183,6 +185,90 @@ def api_logs(lines: int = 200):
         return JSONResponse({"ok": True, "lines": tail})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+def _auth_ok(request: Request) -> tuple[bool, JSONResponse | None]:
+    # Optional token auth: if AGENT_TOKEN is set, require header X-Agent-Token
+    if AGENT_TOKEN:
+        provided = request.headers.get("x-agent-token", "").strip()
+        if provided != AGENT_TOKEN:
+            return False, JSONResponse({"ok": False, "error": "unauthorized"}, status_code=401)
+    # Optional HMAC signing
+    if AGENT_SIGNING_KEY:
+        ts = request.headers.get("x-agent-timestamp", "").strip()
+        sig = request.headers.get("x-agent-sig", "").strip().lower()
+        try:
+            ts_i = int(ts)
+        except Exception:
+            return False, JSONResponse({"ok": False, "error": "missing_or_bad_timestamp"}, status_code=401)
+        now = int(time.time())
+        if abs(now - ts_i) > SIGNING_SKEW:
+            return False, JSONResponse({"ok": False, "error": "timestamp_skew"}, status_code=401)
+        # Note: caller ensures body read
+    return True, None
+
+
+@app.get("/api/macros")
+def api_macros_get():
+    try:
+        src = MACROS_USER if MACROS_USER.exists() else MACROS_DEFAULT
+        if not src.exists():
+            return JSONResponse({"ok": True, "rules": [], "source": None})
+        data = src.read_text(encoding="utf-8")
+        return JSONResponse({"ok": True, "rules_raw": data, "source": str(src)})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/macros")
+async def api_macros_set(request: Request):
+    # Auth
+    ok, resp = _auth_ok(request)
+    if not ok:
+        return resp  # type: ignore[return-value]
+    # Content type
+    ctype = (request.headers.get("content-type") or "").lower()
+    if "application/json" not in ctype:
+        return JSONResponse({"ok": False, "error": "unsupported_media_type"}, status_code=415)
+    # Body + HMAC
+    body = await request.body()
+    if AGENT_SIGNING_KEY:
+        ts = request.headers.get("x-agent-timestamp", "").strip()
+        digest = hmac.new(AGENT_SIGNING_KEY, str(ts).encode() + b"." + body, hashlib.sha256).hexdigest()
+        provided = request.headers.get("x-agent-sig", "").strip().lower()
+        if not hmac.compare_digest(provided, digest):
+            return JSONResponse({"ok": False, "error": "bad_signature"}, status_code=401)
+    # Parse and validate
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "bad_json"}, status_code=400)
+    rules = payload.get("rules") if isinstance(payload, dict) else None
+    if not isinstance(rules, list):
+        return JSONResponse({"ok": False, "error": "rules_must_be_list"}, status_code=400)
+    clean: list[dict] = []
+    for idx, item in enumerate(rules):
+        if not isinstance(item, dict):
+            return JSONResponse({"ok": False, "error": f"rule_{idx}_not_object"}, status_code=400)
+        m = str(item.get("match") or "").strip()
+        r = str(item.get("rewrite") or "").strip()
+        if not m or not r:
+            return JSONResponse({"ok": False, "error": f"rule_{idx}_missing_fields"}, status_code=400)
+        if len(m) > 200 or len(r) > 400:
+            return JSONResponse({"ok": False, "error": f"rule_{idx}_too_long"}, status_code=400)
+        clean.append({"match": m, "rewrite": r})
+    try:
+        MACROS_USER.parent.mkdir(parents=True, exist_ok=True)
+        MACROS_USER.write_text(json.dumps(clean, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": f"write_failed: {e}"}, status_code=500)
+    # Reload in agent_main if available
+    try:
+        from agent import agent_main as _am
+        count = _am.reload_macros_from_files()  # type: ignore[attr-defined]
+    except Exception:
+        count = None
+    return JSONResponse({"ok": True, "saved": True, "count": count})
 
 
 if __name__ == "__main__":

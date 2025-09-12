@@ -68,6 +68,16 @@ tuning tips, and quick examples. Designed for NVDA/Narrator users.
   - `python agent/agent_main.py --calibrate`
   - Then start with: `./scripts/start_agent.ps1 -Threshold <recommended>`
 
+### Macros (Custom Voice Rewrites)
+- Where: Default rules at `agent/config/macros.json`. User override at `logs/macros.json` (takes precedence)
+- Format: JSON array of objects with `match` (regex) and `rewrite` (replacement). See `docs/macros-sample.json`
+- Live reload: Say “agent reload macros”, or use the Macros Editor in the controller page
+- Tips:
+  - Use `^` and `$` to anchor full phrases, e.g., `^open vs code$`
+  - Capture groups `(…)` can be referenced in `rewrite` as `$1`, `$2`, etc.
+  - Keep patterns short and unambiguous; prefer case-insensitive phrasing
+  - If a rule misfires, adjust the regex or order; the first matching rule is applied
+
 ## Troubleshooting
 - Triggers too often: raise `-Threshold` (1100–1500)
 - Doesn’t trigger: lower to 700–800; check RDP mic levels

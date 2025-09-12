@@ -101,6 +101,12 @@ def _load_macros() -> list[tuple[re.Pattern[str], str]]:
             continue
     return rules
 
+def reload_macros_from_files() -> int:
+    """Reload macros from config and logs folders. Returns count."""
+    global _macros
+    _macros = _load_macros()
+    return len(_macros)
+
 def generate_text(user_text: str) -> str:
     """Generate a response to the user's input using the decision engine."""
     try:

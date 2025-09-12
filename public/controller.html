@@ -59,6 +59,15 @@
           <pre id="logs" style="min-height:120px"></pre>
         </div>
       </div>
+      <div style="margin-top:16px">
+        <h3>Macros Editor</h3>
+        <p class="hint">Edit regex-based rewrite rules. Format: array of {match, rewrite}.</p>
+        <textarea id="macros" style="width:100%;min-height:200px"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button class="big" id="btnLoadMacros">Load</button>
+          <button class="big" id="btnSaveMacros">Save</button>
+        </div>
+      </div>
     </section>
   </main>
 <script>
@@ -96,13 +105,39 @@ async function refreshLogs(){
     }
   } catch(e) {}
 }
+async function loadMacros(){
+  try {
+    const r = await fetch('/api/macros');
+    const j = await r.json();
+    if (j.ok) {
+      document.getElementById('macros').value = (j.rules_raw || '[]');
+    }
+  } catch(e) {}
+}
+async function saveMacros(){
+  const raw = document.getElementById('macros').value;
+  let rules;
+  try { rules = JSON.parse(raw) } catch(e) { alert('Invalid JSON'); return }
+  const headers = { 'Content-Type': 'application/json' };
+  const t = localStorage.getItem('agent_token');
+  if (t) headers['X-Agent-Token'] = t;
+  try {
+    const res = await fetch('/api/macros', { method:'POST', headers, body: JSON.stringify({rules}) });
+    const j = await res.json();
+    if (j.ok) { alert('Saved' + (j.count!=null?` and reloaded ${j.count} rules`:'') ); }
+    else { alert(j.error || 'Error'); }
+  } catch(e) { alert('Network error'); }
+}
 btnStart.onclick=()=>send('start');
 btnStop.onclick=()=>send('stop');
 btnRefresh.onclick=()=>refreshStatus();
 btnLogs.onclick=()=>refreshLogs();
+btnLoadMacros.onclick=()=>loadMacros();
+btnSaveMacros.onclick=()=>saveMacros();
 btnDictate.onclick=()=>{ const c=prompt('Speak or type command:'); if(c) send('dictate',{text:c}); };
 refreshStatus();
 refreshLogs();
+loadMacros();
 </script>
 </body>
 </html>

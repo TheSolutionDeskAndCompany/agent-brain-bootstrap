@@ -1,0 +1,6 @@
+[
+  { "match": "^open (?:vs ?code|visual studio code)$", "rewrite": "open Visual Studio Code" },
+  { "match": "^search docs for (.+)$", "rewrite": "search the documentation for '$1' and summarize top 3 results" },
+  { "match": "^create file (.+)$", "rewrite": "create a file named $1 with a minimal example" },
+  { "match": "^explain error (.+)$", "rewrite": "explain the error '$1', typical causes, and how to fix it" }
+]
