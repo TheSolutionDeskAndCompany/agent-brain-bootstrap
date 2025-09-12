@@ -66,6 +66,27 @@
     const historyEl = document.getElementById('history');
     const rdpEl = document.getElementById('rdp');
     let lastResponse = '';
+    let retryDelay = 1000; // start at 1s
+    const maxRetryDelay = 8000;
+
+    // Offline queue (persisted in localStorage)
+    function loadQueue(){
+      try{ return JSON.parse(localStorage.getItem('agent_queue')||'[]') }catch(e){ return [] }
+    }
+    function saveQueue(q){ localStorage.setItem('agent_queue', JSON.stringify(q||[])) }
+    async function flushQueue(){
+      const q = loadQueue();
+      if (!q.length) return;
+      announce(`Sending ${q.length} queued request(s)...`);
+      for (let i=0;i<q.length;i++){
+        const item = q[i];
+        try { await sendCore(item.text, true); q[i] = null; } catch(e){ /* leave in queue */ }
+      }
+      const nq = q.filter(Boolean);
+      saveQueue(nq);
+      if (!nq.length) announce('All queued requests sent.');
+    }
+    window.addEventListener('online', flushQueue);
 
     // Set this to your connection path:
     // Option A (recommended): native RDP profile served as download
@@ -80,21 +101,43 @@
     async function send() {
       const text = inputEl.value.trim();
       if (!text) { announce('Please enter or dictate a request.'); return; }
-      announce('Sending to agent...');
+      if (!navigator.onLine) {
+        const q = loadQueue(); q.push({text}); saveQueue(q);
+        announce('Offline: queued for later.'); if (navigator.vibrate) navigator.vibrate([30,60,30]);
+        return;
+      }
+      await sendCore(text);
+    }
+
+    async function sendCore(text, silent){
+      if (!silent) announce('Sending to agent...');
+      const headers = {'Content-Type':'application/json'};
+      const t = localStorage.getItem('agent_token');
+      if (t) headers['X-Agent-Token'] = t;
       try {
-        const headers = {'Content-Type':'application/json'};
-        const t = localStorage.getItem('agent_token');
-        if (t) headers['X-Agent-Token'] = t;
         const res = await fetch(API('/api/agent'), {
           method: 'POST', headers, body: JSON.stringify({ input: text })
         });
         const data = await res.json();
         lastResponse = data.output || '';
         addHistory(text, lastResponse);
-        speak(lastResponse);
-        announce('Response ready.');
+        if (!silent) speak(lastResponse);
+        if (navigator.vibrate) navigator.vibrate(20);
+        if (!silent) announce('Response ready.');
+        retryDelay = 1000; // reset backoff on success
       } catch (e) {
-        announce('Network error. Please try again.');
+        if (!silent) announce('Network error. Will retry...');
+        if (navigator.vibrate) navigator.vibrate([60, 60, 60]);
+        // Backoff retry once, then queue
+        await new Promise(r=>setTimeout(r, retryDelay));
+        retryDelay = Math.min(maxRetryDelay, retryDelay*2);
+        try {
+          if (!silent) announce('Retrying...');
+          await sendCore(text, true);
+        } catch(e2) {
+          const q = loadQueue(); q.push({text}); saveQueue(q);
+          if (!silent) announce('Still offline: queued for later.');
+        }
       }
     }
 
@@ -128,7 +171,8 @@
 
     document.getElementById('send').addEventListener('click', send);
     document.getElementById('speak').addEventListener('click', () => speak(lastResponse));
+    // Periodic flush
+    setInterval(flushQueue, 5000);
   </script>
 </body>
 </html>
-

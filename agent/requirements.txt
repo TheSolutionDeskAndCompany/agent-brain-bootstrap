@@ -4,3 +4,4 @@ sounddevice==0.4.7
 numpy==1.26.4
 fastapi==0.116.1
 uvicorn==0.30.6
+keyring>=24.3.1
