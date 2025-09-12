@@ -63,7 +63,7 @@ def _rate_limit_ok(ip: str) -> bool:
 
 
 @app.post("/api/agent")
-async def agent(req: AgentRequest, request: Request):
+async def agent(request: Request):
     # Require JSON content type
     ctype = (request.headers.get('content-type') or '').lower()
     if 'application/json' not in ctype:
@@ -92,7 +92,11 @@ async def agent(req: AgentRequest, request: Request):
     client_ip = request.client.host if request.client else "unknown"
     if not _rate_limit_ok(client_ip):
         return JSONResponse({"ok": False, "error": "rate_limited"}, status_code=429)
-    text = (req.input or "").strip()
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "bad_json"}, status_code=400)
+    text = str((data or {}).get('input') or '').strip()
     if not text:
         return JSONResponse({"ok": False, "error": "empty_input"}, status_code=400)
     if len(text) > 4000:

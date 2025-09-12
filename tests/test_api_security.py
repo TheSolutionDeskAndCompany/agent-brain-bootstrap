@@ -85,3 +85,26 @@ def test_mobile_token_and_validation():
     # With token and JSON
     r = client.post('/api/agent', headers={'X-Agent-Token': token}, json={'input': 'hello'})
     assert r.json().get('ok') is True
+
+
+def test_controller_dictate_length_limit():
+    token = 't2'
+    mod = reload_server_with_env({
+        'AGENT_TOKEN': token,
+        'AGENT_HOST': '127.0.0.1',
+        'MAX_TEXT_LEN': '10',
+    })
+    client = TestClient(mod.app)
+    h = {'X-Agent-Token': token}
+    r = client.post('/api/command', headers=h, json={'action':'dictate', 'payload':{'text':'01234567890'}})
+    assert r.status_code == 413
+
+
+def test_mobile_requires_json_content_type():
+    token = 'tok2'
+    import mobile_server as m
+    importlib.reload(m)
+    os.environ['AGENT_TOKEN'] = token
+    client = TestClient(m.app)
+    r = client.post('/api/agent', headers={'X-Agent-Token': token}, data='input=hello')
+    assert r.status_code == 415

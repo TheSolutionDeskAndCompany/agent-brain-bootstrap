@@ -373,7 +373,7 @@ def run_voice_loop(
     log.info(f"Starting voice loop in {mode} mode" + (" (No TTS)" if no_tts else ""))
     
     def _handle_settings(cmd: str) -> Optional[str]:
-        nonlocal threshold, wake_word
+        nonlocal threshold, wake_word, device
         t = _normalize(cmd)
         # set threshold to N
         m = re.match(r"^set (?:the )?threshold (?:to|=)\s*(\d{2,5})$", t)
@@ -402,6 +402,20 @@ def run_voice_loop(
             if state is not None:
                 state["wake_word"] = None
             return "[settings] Wake word disabled"
+
+        # set input device to N
+        m = re.match(r"^set (?:the )?input\s*device (?:to|=)\s*(\d{1,4})$", t)
+        if m:
+            try:
+                idx = int(m.group(1))
+                # Probe device name to validate
+                _ = sd.query_devices(idx)
+                device = idx
+                if state is not None:
+                    state["device"] = idx
+                return f"[settings] Input device set to index {idx}"
+            except Exception:
+                return "[settings] Invalid input device index"
 
         return None
 

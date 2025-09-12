@@ -19,6 +19,7 @@ LOG_PATH = os.path.join(LOG_DIR, "agent.log")
 
 _last_transcript = None  # type: ignore
 _last_reply = None       # type: ignore
+_history: list[tuple[str, str]] = []
 STATUS_LINE = ""         # set in main()
 RUNTIME_STATE = {
     "mode": None,
@@ -39,7 +40,7 @@ def log_line(kind: str, text: str) -> None:
 def generate_text(user_text: str) -> str:
     """Generate a response to the user's input using the decision engine."""
     try:
-        global _last_transcript, _last_reply
+        global _last_transcript, _last_reply, _history
 
         # Handle built-in commands locally (no model call)
         t_norm = (user_text or "").strip().lower()
@@ -56,6 +57,42 @@ def generate_text(user_text: str) -> str:
         if t_norm in ("agent status", "status"):
             return build_status()
 
+        if t_norm in ("agent help", "help"):
+            return (
+                "[help] Say 'agent status' | 'agent repeat last' | "
+                "'set threshold to 1100' | 'disable wake word'.\n"
+                "[help] You can also say 'agent history last 5' or 'agent audio device'."
+            )
+
+        # History: 'agent history last N' or 'agent history'
+        import re as _re
+        m = _re.match(r"^(?:agent\s+)?history(?:\s+last\s+(\d+))?$", t_norm)
+        if m:
+            try:
+                n = int(m.group(1)) if m.group(1) else 5
+            except Exception:
+                n = 5
+            items = _history[-n:]
+            if not items:
+                return "[history] No interactions yet."
+            lines = ["[history] Recent interactions:"]
+            for i, (q, a) in enumerate(items, 1):
+                lines.append(f"{i}. you: {q}")
+                lines.append(f"   agent: {a}")
+            return "\n".join(lines)
+
+        if t_norm in ("agent audio device", "audio device"):
+            try:
+                idx = RUNTIME_STATE.get("device")
+                name = 'default'
+                if idx is not None:
+                    name = sd.query_devices(idx)['name']
+                else:
+                    name = sd.query_devices(None)['name']
+                return f"[audio] Input device: {name} (index={idx if idx is not None else 'default'})"
+            except Exception:
+                return "[audio] Input device: default"
+
         brain = get_latest_brain_post()
         mood = (brain.get("acf") or {}).get("agent_emotions")
         persona = (brain.get("acf") or {}).get("agent_personality")
@@ -66,6 +103,9 @@ def generate_text(user_text: str) -> str:
         _last_reply = reply
         log_line("YOU", user_text)
         log_line("AGENT", reply)
+        _history.append((user_text, reply))
+        if len(_history) > 20:
+            _history = _history[-20:]
 
         return reply
     except Exception as e:
