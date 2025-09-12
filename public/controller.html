@@ -39,14 +39,16 @@
       <a class="big linklike" href="/public/status.html">Status</a>
       <button class="big" id="btnRefresh">Refresh</button>
     </div>
-    <div class="row" aria-label="Settings" style="margin-top:8px">
-      <button class="big" id="btnVad">Toggle WebRTC VAD</button>
-      <select class="big" id="selVerb" aria-label="Verbosity">
-        <option value="quiet">Verbosity: Quiet</option>
-        <option value="normal" selected>Verbosity: Normal</option>
-        <option value="verbose">Verbosity: Verbose</option>
-      </select>
-    </div>
+    <button class="big" id="btnAdvanced" aria-expanded="false" aria-controls="advanced">Show Advanced</button>
+    <section id="advanced" aria-labelledby="sec-live" hidden>
+      <div class="row" aria-label="Settings" style="margin-top:8px">
+        <button class="big" id="btnVad">Toggle WebRTC VAD</button>
+        <select class="big" id="selVerb" aria-label="Verbosity">
+          <option value="quiet" selected>Verbosity: Quiet</option>
+          <option value="normal">Verbosity: Normal</option>
+          <option value="verbose">Verbosity: Verbose</option>
+        </select>
+      </div>
     <div class="wrap">
       <strong>Status:</strong>
       <span class="hint" id="status">Loading...</span>
@@ -84,6 +86,8 @@
   </main>
 <script>
 let currentState = {};
+let advOpen = false;
+let perfTimer = null;
 async function send(action, payload) {
   try {
     const headers = { 'Content-Type': 'application/json' };
@@ -106,7 +110,9 @@ async function refreshStatus(){
     const r = await fetch('/api/status');
     const j = await r.json();
     document.getElementById('status').textContent = j.status || '';
-    document.getElementById('statusJson').textContent = JSON.stringify(j, null, 2);
+    if (advOpen) {
+      document.getElementById('statusJson').textContent = JSON.stringify(j, null, 2);
+    }
     if (j.state) {
       currentState = j.state;
       const sel = document.getElementById('selVerb');
@@ -165,6 +171,22 @@ btnLogs.onclick=()=>refreshLogs();
 btnLoadMacros.onclick=()=>loadMacros();
 btnSaveMacros.onclick=()=>saveMacros();
 btnDictate.onclick=()=>{ const c=prompt('Speak or type command:'); if(c) send('dictate',{text:c}); };
+btnAdvanced.onclick=()=>{
+  const sec = document.getElementById('advanced');
+  advOpen = sec.hasAttribute('hidden');
+  if (advOpen) {
+    sec.removeAttribute('hidden');
+    btnAdvanced.textContent = 'Hide Advanced';
+    btnAdvanced.setAttribute('aria-expanded', 'true');
+    refreshStatus(); refreshLogs(); loadMacros(); refreshPerf();
+    if (!perfTimer) perfTimer = setInterval(refreshPerf, 5000);
+  } else {
+    sec.setAttribute('hidden', '');
+    btnAdvanced.textContent = 'Show Advanced';
+    btnAdvanced.setAttribute('aria-expanded', 'false');
+    if (perfTimer) { clearInterval(perfTimer); perfTimer = null; }
+  }
+}
 btnVad.onclick=()=>{
   const now = !!(currentState && currentState.use_webrtcvad);
   setSettings({use_webrtcvad: !now}).then(()=>refreshStatus());
