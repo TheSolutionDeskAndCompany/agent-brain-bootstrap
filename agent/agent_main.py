@@ -1,5 +1,6 @@
 import os
 import time
+import json
 import argparse
 import logging
 import sounddevice as sd
@@ -16,6 +17,8 @@ log = get_logger("agent_main")
 LOG_DIR = os.path.join(os.getcwd(), "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 LOG_PATH = os.path.join(LOG_DIR, "agent.log")
+SETTINGS_PATH = os.path.join(LOG_DIR, "settings.json")
+HISTORY_PATH = os.path.join(LOG_DIR, "history.json")
 
 _last_transcript = None  # type: ignore
 _last_reply = None       # type: ignore
@@ -35,6 +38,44 @@ def log_line(kind: str, text: str) -> None:
             f.write(f"[{ts}] {kind}: {text}\n")
     except Exception:
         # Don't break runtime if logging fails
+        pass
+
+def _load_settings() -> dict:
+    try:
+        if os.path.isfile(SETTINGS_PATH):
+            with open(SETTINGS_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f) or {}
+    except Exception:
+        pass
+    return {}
+
+def _save_settings(data: dict) -> None:
+    try:
+        with open(SETTINGS_PATH, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+    except Exception:
+        pass
+
+def _load_history(limit: int = 20) -> list[tuple[str, str]]:
+    try:
+        if os.path.isfile(HISTORY_PATH):
+            with open(HISTORY_PATH, 'r', encoding='utf-8') as f:
+                items = json.load(f) or []
+                out = []
+                for it in items[-limit:]:
+                    if isinstance(it, list) and len(it) == 2:
+                        out.append((str(it[0]), str(it[1])))
+                return out
+    except Exception:
+        pass
+    return []
+
+def _save_history(hist: list[tuple[str, str]], limit: int = 50) -> None:
+    try:
+        items = hist[-limit:]
+        with open(HISTORY_PATH, 'w', encoding='utf-8') as f:
+            json.dump(items, f, ensure_ascii=False, indent=2)
+    except Exception:
         pass
 
 def generate_text(user_text: str) -> str:
@@ -61,7 +102,7 @@ def generate_text(user_text: str) -> str:
             return (
                 "[help] Say 'agent status' | 'agent repeat last' | "
                 "'set threshold to 1100' | 'disable wake word'.\n"
-                "[help] You can also say 'agent history last 5' or 'agent audio device'."
+                "[help] You can also say 'agent history last 5' or 'agent audio device' or 'agent save settings'."
             )
 
         # History: 'agent history last N' or 'agent history'
@@ -80,6 +121,19 @@ def generate_text(user_text: str) -> str:
                 lines.append(f"{i}. you: {q}")
                 lines.append(f"   agent: {a}")
             return "\n".join(lines)
+
+        if t_norm in ("agent save settings", "save settings"):
+            try:
+                s = _load_settings()
+                s.update({
+                    "wake_word": RUNTIME_STATE.get("wake_word"),
+                    "threshold": RUNTIME_STATE.get("threshold"),
+                    "device": RUNTIME_STATE.get("device"),
+                })
+                _save_settings(s)
+                return "[settings] Saved current settings to settings.json"
+            except Exception:
+                return "[settings] Failed to save settings"
 
         if t_norm in ("agent audio device", "audio device"):
             try:
@@ -106,6 +160,7 @@ def generate_text(user_text: str) -> str:
         _history.append((user_text, reply))
         if len(_history) > 20:
             _history = _history[-20:]
+        _save_history(_history, limit=50)
 
         return reply
     except Exception as e:
@@ -126,16 +181,37 @@ def main():
                       help='Voice activation threshold (auto mode). Default: 900')
     parser.add_argument('--calibrate', action='store_true',
                       help='Run a short mic calibration to suggest a threshold, then exit')
+    parser.add_argument('--apply', action='store_true',
+                      help='When used with --calibrate, automatically save the suggested threshold')
+    parser.add_argument('--no-settings', action='store_true',
+                      help='Ignore persisted settings.json values')
+    parser.add_argument('--save-settings', action='store_true',
+                      help='Persist current threshold/wake word/device to settings.json and exit')
+    parser.add_argument('--calibrate', action='store_true',
+                      help='Run a short mic calibration to suggest a threshold, then exit')
     
     args = parser.parse_args()
     
-    # Set up logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='[%(asctime)s] %(levelname)s: %(message)s',
-        datefmt='%H:%M:%S'
-    )
+    # Set up logging (console via basicConfig already in get_logger)
+    # Add rotating file handler for agent.log
+    try:
+        from logging.handlers import RotatingFileHandler
+        fh_present = any(isinstance(h, RotatingFileHandler) for h in log.handlers)
+        if not fh_present:
+            fh = RotatingFileHandler(LOG_PATH, maxBytes=512*1024, backupCount=3, encoding='utf-8')
+            fh.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s', datefmt='%H:%M:%S'))
+            log.addHandler(fh)
+            log.setLevel(logging.INFO)
+    except Exception:
+        pass
     
+    # Load history for continuity
+    try:
+        global _history
+        _history = _load_history(20)
+    except Exception:
+        pass
+
     # Check for AssemblyAI API key
     if not os.getenv("ASSEMBLYAI_API_KEY"):
         log.error("ASSEMBLYAI_API_KEY environment variable not set")
@@ -143,7 +219,6 @@ def main():
         print("Please set it in your .env file or environment variables.")
         print("You can get a free API key at https://app.assemblyai.com/signup")
         return
-    
     # Optional: quick mic calibration
     if args.calibrate:
         try:
@@ -159,7 +234,20 @@ def main():
             # Suggest threshold as 2.5x ambient RMS, clamped
             rec = int(max(600, min(2000, rms * 2.5)))
             print(f"[calibrate] Ambient RMS ~ {rms:.1f} -> suggested Threshold ~ {rec}")
-            print("[calibrate] Try: ./scripts/start_agent.ps1 -Threshold {rec}")
+            if args.apply:
+                s = _load_settings()
+                s.update({"threshold": rec})
+                _save_settings(s)
+                print(f"[calibrate] Saved to settings.json (threshold={rec})")
+            else:
+                ans = input("[calibrate] Save this threshold for future runs? [y/N] ").strip().lower()
+                if ans == 'y':
+                    s = _load_settings()
+                    s.update({"threshold": rec})
+                    _save_settings(s)
+                    print(f"[calibrate] Saved to settings.json (threshold={rec})")
+                else:
+                    print("[calibrate] Not saved. You can run again with --apply to save automatically.")
         except Exception as e:
             log.error(f"Calibration failed: {e}")
             print(f"[calibrate] Error: {e}")
@@ -192,16 +280,42 @@ def main():
                 f"Model: qwen2.5 via Goose  | Input: {inp}  | Threshold: {th}"
             )
 
-        # initialize runtime state
+        # Initialize runtime state (apply persisted settings if present and not overridden)
+        settings = {} if args.no_settings else _load_settings()
+        wake_word = args.wake_word
+        threshold = args.threshold
+        device = args.device
+        if not args.no_settings:
+            try:
+                if wake_word == 'agent' and settings.get('wake_word'):
+                    wake_word = settings.get('wake_word')
+                if threshold == 900 and isinstance(settings.get('threshold'), int):
+                    threshold = int(settings.get('threshold'))
+                if device is None and settings.get('device') is not None:
+                    device = int(settings.get('device'))
+            except Exception:
+                pass
+
         RUNTIME_STATE.update({
             "mode": args.mode,
-            "wake_word": (args.wake_word or None),
-            "threshold": args.threshold,
-            "device": args.device,
+            "wake_word": (wake_word or None),
+            "threshold": threshold,
+            "device": device,
         })
 
         STATUS_LINE = build_status()
         print(STATUS_LINE)
+
+        if args.save_settings:
+            s = _load_settings()
+            s.update({
+                "wake_word": RUNTIME_STATE.get("wake_word"),
+                "threshold": RUNTIME_STATE.get("threshold"),
+                "device": RUNTIME_STATE.get("device"),
+            })
+            _save_settings(s)
+            print("[settings] Saved current settings to settings.json. Exiting.")
+            return
 
         # Start controller server in background
         try:
@@ -214,9 +328,9 @@ def main():
             generate_text=generate_text,
             mode=args.mode,
             no_tts=args.no_tts,
-            device=args.device,
-            threshold=args.threshold,
-            wake_word=(args.wake_word or None),
+            device=RUNTIME_STATE.get("device"),
+            threshold=RUNTIME_STATE.get("threshold"),
+            wake_word=RUNTIME_STATE.get("wake_word"),
             state=RUNTIME_STATE,
         )
 

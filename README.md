@@ -100,3 +100,52 @@ Use the Siri Shortcut recipe in `docs/ACCESSIBILITY.md`.
 Accessibility
 See `docs/ACCESSIBILITY.md` for VoiceOver/VoiceView usage, in-session screen readers, and best practices.
 
+## API Examples (curl)
+
+Controller (localhost by default):
+
+1) Status
+```
+curl -s http://127.0.0.1:8765/api/status | jq
+```
+
+2) With token
+```
+export TOKEN=your_token
+curl -s -H "X-Agent-Token: $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"action":"status"}' http://127.0.0.1:8765/api/command | jq
+```
+
+3) With HMAC signing (optional)
+```
+export TOKEN=your_token
+export KEY=your_shared_signing_key
+TS=$(date +%s)
+BODY='{"action":"dictate","payload":{"text":"hello"}}'
+SIG=$(python - <<PY
+import hmac,hashlib,os,sys
+key=os.environ['KEY'].encode(); ts=os.environ['TS'].encode(); body=os.environ['BODY'].encode()
+print(hmac.new(key, ts+b'.'+body, hashlib.sha256).hexdigest())
+PY
+)
+curl -s -H "X-Agent-Token: $TOKEN" -H "X-Agent-Timestamp: $TS" -H "X-Agent-Sig: $SIG" \
+  -H 'Content-Type: application/json' -d "$BODY" http://127.0.0.1:8765/api/command | jq
+```
+
+Mobile API (default 127.0.0.1:8000 when run manually):
+```
+curl -s -H "X-Agent-Token: $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"input":"Summarize the repo."}' http://127.0.0.1:8000/api/agent | jq
+```
+
+## Calibration (optional)
+
+- Estimate a good VAD threshold from ambient noise:
+```
+python agent/agent_main.py --calibrate --apply
+```
+- Start with saved settings:
+```
+./scripts/start_agent.ps1
+```
+

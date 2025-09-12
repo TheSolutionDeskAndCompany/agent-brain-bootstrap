@@ -1,15 +1,15 @@
 # Accessibility (iPhone + Amazon Fire)
 
-## Screen readers
-- iPhone: VoiceOver (Settings → Accessibility → VoiceOver).
-- Amazon Fire: VoiceView (Settings → Accessibility → VoiceView) or TalkBack on Android-based devices.
+## Screen Readers
+- iPhone: VoiceOver (Settings > Accessibility > VoiceOver)
+- Amazon Fire: VoiceView (Settings > Accessibility > VoiceView) or TalkBack on Android-based devices
 
 ## Using the Mobile UI
-1. Open: `/public/mobile/index.html` (or Add to Home Screen).
-2. Dictate with the system mic (keyboard mic on iPhone / Fire).
-3. Send to Agent: Double-tap. The page announces status and speaks the answer.
-4. Speak Response: Replays the last answer.
-5. Connect to Desktop: Opens the RDP profile (native client) or web session.
+1. Open: `/public/mobile/index.html` (or Add to Home Screen)
+2. Dictate with the system mic (keyboard mic on iPhone / Fire)
+3. Send to Agent: Double-tap. The page announces status and speaks the answer
+4. Speak Response: Replays the last answer
+5. Connect to Desktop: Opens the RDP profile (native client) or web session
 
 Security headers (optional)
 - If `AGENT_TOKEN` is set on the server, add a header in your client requests:
@@ -17,29 +17,38 @@ Security headers (optional)
 - For non-browser clients, you can enable signing with `AGENT_SIGNING_KEY` and send:
   - `X-Agent-Timestamp: <epoch seconds>`
   - `X-Agent-Sig: <hex sha256 of "<timestamp>.<body>" with the key>`
-  - Note: Don’t embed signing keys in browser UIs; prefer a reverse proxy to sign or use token-only on trusted networks.
+  - Note: Don’t embed signing keys in browser UIs; prefer a reverse proxy to sign or use token-only on trusted networks
 
 ## One-tap Remote Desktop (RDP)
 Native app (recommended):
-- Install Microsoft Remote Desktop (iOS / Android). On Fire tablets, use Amazon Appstore version or a compatible RDP client.
-- Tap Connect to Desktop (serves `public/rdp/desktop.rdp`) → the RD client opens and connects.
+- Install Microsoft Remote Desktop (iOS / Android). On Fire tablets, use Amazon Appstore version or a compatible RDP client
+- Tap Connect to Desktop (serves `public/rdp/desktop.rdp`) — the RD client opens and connects
 
 Web fallback:
-- Use a Guacamole gateway (see `docker-compose.rdp.yml`). Link your mobile UI to `/guac/#/client/<id>` behind a reverse proxy.
+- Use a Guacamole gateway (see `docker-compose.rdp.yml`). Link your mobile UI to `/guac/#/client/<id>` behind a reverse proxy
 
-## In-session accessibility
-- Windows: enable NVDA or JAWS for spoken UI; increase display scaling.
-- Linux: enable Orca.
-- Prefer large targets and high contrast; avoid color-only cues. Keep audio feedback on.
+## In-session Accessibility
+- Windows: enable NVDA or JAWS for spoken UI; increase display scaling
+- Linux: enable Orca
+- Prefer large targets and high contrast; avoid color-only cues. Keep audio feedback on
 
 ## Siri Shortcut (iPhone)
 Actions:
-1. Dictate Text (ask “What should I ask the agent?”)
-2. Get Contents of URL (POST `http://<server>:8000/api/agent`, JSON `{"input": Provided Input}`)
-3. Get Dictionary Value → `output`
+1. Dictate Text (ask "What should I ask the agent?")
+2. Get Contents of URL — POST `http://<server>:8000/api/agent`, JSON `{ "input": Dictated Text }`
+3. Get Dictionary Value — `output`
 4. Speak Text
-Phrase: “Hey Siri, Ask Agent”.
+Phrase: "Hey Siri, Ask Agent"
 
-## Fire tablet tips
-- Use VoiceView tutorial to learn gestures.
-- If Microsoft RD Client isn’t available in Appstore, use a compatible RDP client or the web gateway.
+Shortcut Headers (if server has a token):
+- In the "Get Contents of URL" action, expand "Show More". Add Header:
+  - Key: `X-Agent-Token`
+  - Value: `<your token>`
+- Body type: JSON. Add a field `input` with "Dictated Text"
+
+Note on signing:
+- If you’ve set `AGENT_SIGNING_KEY`, signing requests in a Shortcut is not ideal because you’d embed the key on device. Prefer a trusted reverse proxy that signs requests on behalf of the Shortcut, or use token-only and keep the API bound to localhost or VPN-limited networks
+
+## Fire Tablet Tips
+- Use VoiceView tutorial to learn gestures
+- If Microsoft RD Client isn’t available in Appstore, use a compatible RDP client or the web gateway
